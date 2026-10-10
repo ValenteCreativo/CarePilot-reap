@@ -817,10 +817,9 @@ export default function CareAgent({
       )}
       {step === 4 && (
         <div className="demo-card-guide">
-          <strong>Reap sandbox test card</strong>
-          <p>4622 9431 2313 7797 · CVC 640 · 12/27 · OTP 456789</p>
+          <strong>Secure sandbox checkout</strong>
           <p>
-            Enter only on Reap’s hosted page.{" "}
+            Use sandbox test details only on Reap’s hosted page.{" "}
             <a
               href="https://docs.reap.global/agentic-payments/setup#test-cards"
               target="_blank"

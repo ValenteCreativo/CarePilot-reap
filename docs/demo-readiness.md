@@ -14,11 +14,7 @@ Use **Chrome or Safari with passkeys enabled**. Reap's hosted enrollment require
 6. Review the final quote, explicitly authorize the product, merchant, shipping, currency and total, then continue to Reap approval. Complete any hosted verification.
 7. CarePilot reads the checkout back from Reap. Success requires `COMPLETED`, an order reference, matching quote/enrollment references and a reconciled final amount. The receipt appears in Budget & payments with a downloadable record.
 
-Official public sandbox test card, entered **only on Reap's hosted page**:
-
-| Number | CVC | Expiry | OTP |
-| --- | --- | --- | --- |
-| 4622 9431 2313 7797 | 640 | 12/27 | 456789 |
+Get sandbox test details from [Reap’s official setup guide](https://docs.reap.global/agentic-payments/setup#test-cards). Enter them only on Reap’s hosted page; CarePilot does not display or store card numbers, CVCs or OTPs.
 
 This deployment enables Reap's documented `X-Simulate-Checkout: COMPLETED` header. It still uses real Reap API requests and hosted enrollment/approval, but the merchant order is **simulated**. No real money or delivery. The UI labels it accordingly and excludes it from real spending.
 
