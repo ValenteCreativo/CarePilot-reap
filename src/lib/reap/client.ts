@@ -2,13 +2,13 @@
 import { z } from 'zod';
 import { AgentError } from '../care-agent/types';
 export class ReapError extends AgentError {
-  constructor(code: string, public upstreamStatus: number, public uncertain: boolean, public retryAfter: string | null) { super(code, `Reap respondió ${code} (HTTP ${upstreamStatus}).`, upstreamStatus >= 500 ? 502 : upstreamStatus === 429 ? 429 : 409); }
+  constructor(code: string, public upstreamStatus: number, public uncertain: boolean, public retryAfter: string | null) { super(code, `Reap responded ${code} (HTTP ${upstreamStatus}).`, upstreamStatus >= 500 ? 502 : upstreamStatus === 429 ? 429 : 409); }
 }
 export function reapConfig() {
   const base = process.env.REAP_BASE_URL;
   const token = process.env.REAP_API_TOKEN;
   const version = process.env.REAP_API_VERSION;
-  if (base !== 'https://sg.sandbox.api.reap.global' || !token || version !== '2025-02-14') throw new AgentError('REAP_CONFIG_MISSING', 'Configura Reap SG sandbox y versión 2025-02-14.', 503);
+  if (base !== 'https://sg.sandbox.api.reap.global' || !token || version !== '2025-02-14') throw new AgentError('REAP_CONFIG_MISSING', 'Configure Reap SG sandbox and version 2025-02-14.', 503);
   return { base, token, version };
 }
 export async function reapRequest<T>(path: string, schema: z.ZodType<T>, body?: unknown, key?: string): Promise<T> {

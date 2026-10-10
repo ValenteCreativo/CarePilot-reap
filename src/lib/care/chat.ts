@@ -18,7 +18,7 @@ const actionSchema = z.object({
   date, due: z.string().max(200), budget: z.number().min(0).max(1000000).nullable(),
   clinical: z.boolean(), reason: z.string().max(1000),
 });
-export const chatResponseSchema = z.object({ reply: z.string().min(1).max(4000).describe('Respuesta conversacional. Si hay actions, di que preparaste una propuesta pendiente de aplicar, nunca que ya creaste, cambiaste o reservaste algo.'), actions: z.array(actionSchema).max(12), shopping: z.object({ mode: z.enum(['research', 'open']), query: z.string().max(160) }).nullable() });
+export const chatResponseSchema = z.object({ reply: z.string().min(1).max(4000).describe('Conversational reply. If there are actions, say you prepared a proposal pending apply, never that you already created, changed or booked something.'), actions: z.array(actionSchema).max(12), shopping: z.object({ mode: z.enum(['research', 'open']), query: z.string().max(160) }).nullable() });
 export type CareChatResponse = z.infer<typeof chatResponseSchema> & { research?: ShoppingResearch; shoppingError?: string };
 export type CareChatAction = CareChatResponse['actions'][number];
 export async function chatCare(input: z.infer<typeof chatRequestSchema>, research = researchShopping): Promise<CareChatResponse> {

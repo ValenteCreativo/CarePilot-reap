@@ -7,20 +7,20 @@ export function proposeCare(input: CareInput): CareProposalResult {
   const eventId = createHash('sha256').update(JSON.stringify([input.familyId, input.source, input.externalEventId || input.text.trim(), input.actorId || ''])).digest('hex').slice(0, 24);
   const text = input.text.trim();
   const normalized = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const owner = /guille.*(?:agenda|encarga|puede)/.test(normalized) ? 'guille' : '';
-  const payer = /yo (?:cubro|pago)|yo.*gastos/.test(normalized) ? input.actorId || '' : '';
-  const budgetMatch = text.match(/(?:presupuesto[^$\d]{0,30}|\$)\s*\$?([\d,]+(?:\.\d{1,2})?)/i);
+  const owner = /guille.*(?:agenda|encarga|puede|will|handle|schedul|take)/.test(normalized) ? 'guille' : '';
+  const payer = /yo (?:cubro|pago)|yo.*gastos|i (?:cover|pay|will cover|will pay)|i.*expenses/.test(normalized) ? input.actorId || '' : '';
+  const budgetMatch = text.match(/(?:presupuesto[^$\d]{0,30}|budget[^$\d]{0,30}|\$)\s*\$?([\d,]+(?:\.\d{1,2})?)/i);
   const budget = budgetMatch ? Number(budgetMatch[1].replace(/,/g, '')) : null;
-  const due = /semana/.test(normalized) ? 'Esta semana · confirmar fecha' : 'Fecha por confirmar';
+  const due = /semana|week/.test(normalized) ? 'This week · confirm date' : 'Date to be confirmed';
   const proposals: Proposal[] = [];
   const add = (title: string, kind: Proposal['kind'], clinical: boolean, cap: number | null, evidence: string, inference: string) => proposals.push({ id: `${eventId}-${proposals.length}`, title, kind, owner, payer, budget: cap, due, clinical, evidence, inference });
-  if (/estudio/.test(normalized)) {
-    const countMatch = normalized.match(/(dos|tres|uno|un|\d+)\s+estudios?/);
-    const count = countMatch ? ({ dos: 2, tres: 3, uno: 1, un: 1 }[countMatch[1]] || Number(countMatch[1])) : 1;
-    for (let i = 0; i < Math.min(count, 10); i++) add(`Agendar estudio ${i + 1}`, 'study', true, null, 'Se mencionaron estudios; no se especificaron sus nombres ni precios.', 'Confirmar estudio, orden médica y fecha antes de agendar.');
+  if (/estudio|study|studies|test/.test(normalized)) {
+    const countMatch = normalized.match(/(dos|tres|uno|un|two|three|one|\d+)\s+(?:estudios?|studies|study|tests?)/);
+    const count = countMatch ? ({ dos: 2, tres: 3, uno: 1, un: 1, two: 2, three: 3, one: 1 }[countMatch[1]] || Number(countMatch[1])) : 1;
+    for (let i = 0; i < Math.min(count, 10); i++) add(`Schedule test ${i + 1}`, 'study', true, null, 'Tests were mentioned; their names and prices were not specified.', 'Confirm the test, the doctor\u2019s order and the date before scheduling.');
   }
-  if (/suministro|higiene|insumos/.test(normalized)) add('Organizar suministros de la semana', 'supplies', false, budget, budget !== null ? `Presupuesto indicado: $${budget} MXN. No es una cotización.` : 'Necesidad de suministros mencionada, sin precio verificado.', 'Confirmar lista de artículos y responsable. Compatibilidad con Reap pendiente.');
-  if (/medicamento|dosis|pastilla/.test(normalized)) add('Revisar indicación de medicamento', 'medication', true, null, 'El mensaje menciona medicamentos; no se ha validado ninguna dosis.', 'Revisar receta con una persona. No se generan dosis ni horarios.');
-  if (!proposals.length) add('Revisar y organizar la solicitud', 'task', false, budget, text, 'Solicitud libre: definir título, responsables y fecha en la revisión.');
-  return { eventId, mode: 'rules', proposals, notes: ['Extracción por reglas locales; no se utilizó un modelo de IA.', 'El presupuesto se interpreta como MXN en esta demo: confirma moneda y montos.', 'Cada propuesta necesita revisión humana. Costos de estudios desconocidos.'] };
+  if (/suministro|higiene|insumos|supplies|hygiene|supply/.test(normalized)) add('Organize this week\u2019s supplies', 'supplies', false, budget, budget !== null ? `Stated budget: $${budget} MXN. It is not a quote.` : 'Supply need mentioned, with no verified price.', 'Confirm the list of items and the person responsible. Reap compatibility pending.');
+  if (/medicamento|dosis|pastilla|medication|dose|pill/.test(normalized)) add('Review medication instruction', 'medication', true, null, 'The message mentions medications; no dose has been validated.', 'Review the prescription with a person. No doses or schedules are generated.');
+  if (!proposals.length) add('Review and organize the request', 'task', false, budget, text, 'Free-form request: define title, people responsible and date during review.');
+  return { eventId, mode: 'rules', proposals, notes: ['Extraction by local rules; no AI model was used.', 'The budget is interpreted as MXN in this demo: confirm currency and amounts.', 'Every proposal needs human review. Test costs unknown.'] };
 }

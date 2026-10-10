@@ -19,11 +19,11 @@ export default function LoginPage() {
             Keep caregiving aligned, one message at a time.
           </h1>
           <p className="text-base leading-relaxed">
-            Inicia sesión para organizar los acuerdos familiares y acceder a tus compras con Reap.
+            Sign in to organize your family agreements and access your purchases with Reap.
           </p>
           <div className="flex items-center gap-3 text-sm">
             <ShieldCheck className="h-4 w-4 text-[#0097b2]" />
-            Tú revisas y autorizas cada compra
+            You review and authorize every purchase
           </div>
         </div>
         <AuthForm mode="login" />

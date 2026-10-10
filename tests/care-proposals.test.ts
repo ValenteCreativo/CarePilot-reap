@@ -17,7 +17,7 @@ test('stable IDs allow replay deduplication without saving input events', () => 
  assert.notEqual(proposeCare({ ...input, familyId: 'another-family' }).eventId, first.eventId);
 });
 test('medication mentions only propose human review, no generated doses', () => {
- const result = proposeCare({ ...input, text: 'Necesitamos revisar los medicamentos' });
+ const result = proposeCare({ ...input, text: 'We need to review the medication' });
  assert.equal(result.proposals[0].kind, 'medication');
  assert.equal(result.proposals[0].clinical, true);
  assert.equal(result.proposals[0].owner, '');
@@ -25,12 +25,12 @@ test('medication mentions only propose human review, no generated doses', () => 
  assert.equal(result.proposals[0].budget, null);
 });
 test('unrecognized instructions remain reviewable rather than becoming fabricated tasks', () => {
- const result = proposeCare({ ...input, text: 'Hay que organizar el transporte' });
+ const result = proposeCare({ ...input, text: 'We need to organize transportation' });
  assert.equal(result.proposals[0].kind, 'task');
  assert.equal(result.proposals[0].owner, '');
  assert.equal(result.mode, 'rules');
 });
 test('thousands separators and explicit budget are preserved', () => {
- const result = proposeCare({ ...input, text: 'Suministros con presupuesto máximo de $1,700.50' });
+ const result = proposeCare({ ...input, text: 'Supplies with a maximum budget of $1,700.50' });
  assert.equal(result.proposals[0].budget, 1700.5);
 });

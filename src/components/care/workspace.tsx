@@ -9,7 +9,7 @@ import type { CareChatAction } from '@/lib/care/chat';
 import { demoInstruction, members as initialMembers, type Agreement, type CareMember, type CareProposalResult } from '@/lib/care/types';
 
 // Board stages. The whole story is left-to-right: a care need becomes an
-// authorized Reap purchase. The "Autorizado con Reap" -> "Comprado" transition
+// authorized Reap purchase. The "Pay with Reap" -> "Resolved" transition
 // IS the agentic checkout, so Reap sits literally in the middle of the workflow.
 type Stage = 'todo' | 'doing' | 'reap' | 'done';
 type Flow = 'task' | 'appointment' | 'expense' | 'payment' | 'help' | null;
@@ -70,7 +70,7 @@ export default function CareWorkspace() {
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(t); }, [notice]);
 
   // Verify the live Reap sandbox connection as soon as the panel loads, so the
-  // judges can see "Reap conectado" without clicking anything.
+  // judges can see "Reap connected" without clicking anything.
   useEffect(() => { void checkReap(); }, []);
   async function checkReap() {
     setCheckingReap(true);
@@ -169,11 +169,11 @@ export default function CareWorkspace() {
 
   return <div className="care-os">
     <header className="os-header">
-      <Link href="/" className="os-brand"><Image src="/images/logos/otters.png" alt="" width={40} height={40} />carepilot<span>copilot para el cuidado</span></Link>
+      <Link href="/" className="os-brand"><Image src="/images/logos/otters.png" alt="" width={40} height={40} />carepilot<span>copilot for care</span></Link>
       <div className="os-header-right">
         <span className={`os-reap-chip ${reapConnected ? 'is-live' : checkingReap ? 'is-checking' : 'is-off'}`}>
           {checkingReap ? <LoaderCircle size={13} className="care-spin" /> : <CircleDot size={13} />}
-          Reap sandbox {reapConnected ? 'conectado' : checkingReap ? 'verificando…' : 'sin verificar'}
+          Reap sandbox {reapConnected ? 'connected' : checkingReap ? 'verifying…' : 'not verified'}
         </span>
         <label className="os-identity"><span className="mini-avatar">{name(actor)[0]}</span><select aria-label="Using the demo as" value={actor} onChange={e => setActor(e.target.value)}>{team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
       </div>
@@ -290,7 +290,7 @@ export default function CareWorkspace() {
         {flow !== 'help' && flow !== 'payment' && <form onSubmit={saveTask} className="simple-form">
           <label>{flow === 'appointment' ? 'What appointment or study is it?' : flow === 'expense' ? 'What do you need to cover?' : 'What needs to be done?'}<input name="title" placeholder={flow === 'appointment' ? 'e.g. Follow-up consultation' : flow === 'expense' ? 'e.g. Diapers, medication, therapy' : 'e.g. Pick up the test results'} maxLength={140} required autoFocus /></label>
           <label>Who handles it?<select name="owner" defaultValue={actor}>{team.map(m => <option key={m.id} value={m.id}>{m.name}{m.id === actor ? ' (me)' : ''}</option>)}</select></label>
-          <label>{flow === 'appointment' ? '¿Cuándo es la cita?' : '¿Para cuándo? (opcional)'}<input type="date" name="date" defaultValue={flow === 'appointment' ? today : ''} required={flow === 'appointment'} /></label>
+          <label>{flow === 'appointment' ? 'When is the appointment?' : 'By when? (optional)'}<input type="date" name="date" defaultValue={flow === 'appointment' ? today : ''} required={flow === 'appointment'} /></label>
           {flow === 'expense' && <div className="expense-fields visible-expense"><label>How much can you allocate? · MXN<input name="budget" type="number" step="0.01" min="0.01" max="1000000" placeholder="Maximum budget" required /></label><label>Who covers the expense?<select name="payer" defaultValue={actor}>{team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label><small>Creates a budget to approve. Once approved it is ready for payment with Reap. This is not a charge.</small></div>}
           {flow !== 'expense' && <details className="optional-expense"><summary><Wallet size={17} /> Is there an expense to organize? <ChevronDown size={15} /></summary><div className="expense-fields"><label>Spending limit · MXN<input name="budget" type="number" step="0.01" min="0" max="1000000" placeholder="e.g. 700" /></label><label>Who covers it?<select name="payer" defaultValue={actor}>{team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label></div><small>Only to organize the budget. No charge is made.</small></details>}
           {flow === 'appointment' && <label className="review-consent"><input type="checkbox" required /> I confirmed the date and the instruction with the healthcare professional.</label>}

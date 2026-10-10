@@ -70,7 +70,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     <Card className="bg-white backdrop-blur-md border-2 border-[#0097b2]/30 shadow-2xl transition-all duration-300">
       <CardHeader className="pt-8">
         <CardTitle className="text-3xl font-parisienne text-[#0097b2] text-center">
-          {isSignup ? "Crea tu cuenta" : "Welcome back"}
+          {isSignup ? "Create your account" : "Welcome back"}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -89,7 +89,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="phone" className="text-xs font-medium text-[#004d6d]">Teléfono</Label>
+                <Label htmlFor="phone" className="text-xs font-medium text-[#004d6d]">Phone</Label>
                 <Input
                   id="phone"
                   placeholder="+1 555 123 4567"

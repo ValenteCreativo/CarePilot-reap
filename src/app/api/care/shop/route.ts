@@ -24,11 +24,11 @@ export async function POST(request: Request) {
   }
   const command=z.object({action:z.literal('quote'),proof:proofSchema,signature:z.string(),variantId:z.string(),email:z.email(),shipping:shippingSchema.optional()}).parse(input);
   // Verify the exact original object including signed catalog fields.
-  if(!verifySigned(input.proof,command.signature) || command.proof.expires<=Date.now()) throw new AgentError('PROPOSAL_EXPIRED','Investiga de nuevo: la propuesta venció o cambió.',409);
+  if(!verifySigned(input.proof,command.signature) || command.proof.expires<=Date.now()) throw new AgentError('PROPOSAL_EXPIRED','Research again: the proposal expired or changed.',409);
   const selected=command.proof.candidates.find(c=>c.variantId===command.variantId);
-  if(!selected) throw new AgentError('PRODUCT_INVALID','Selecciona un producto confirmado por Reap.');
+  if(!selected) throw new AgentError('PRODUCT_INVALID','Select a product confirmed by Reap.');
   if(Date.now()-quoteWindow.starts>900000) quoteWindow={starts:Date.now(),count:0};
-  if(++quoteWindow.count>5) throw new AgentError('RATE_LIMIT','Límite de cinco cotizaciones por 15 minutos para esta demo.',429);
+  if(++quoteWindow.count>5) throw new AgentError('RATE_LIMIT','Limit of five quotes per 15 minutes for this demo.',429);
   const quote=await reap.createQuote(itemQuote(selected.variantId,command.email,selected.requiresShipping,command.shipping),randomUUID());
   return NextResponse.json({quote,withinBudget:quote.amountBreakdown.finalAmount.currency==='MXN' && quote.amountBreakdown.finalAmount.amount<=700},{headers:{'Cache-Control':'no-store'}});
  }catch(error){return fail(error);}

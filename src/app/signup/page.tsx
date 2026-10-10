@@ -19,11 +19,11 @@ export default function SignupPage() {
             Start your CarePilot trial in minutes.
           </h1>
           <p className="text-base leading-relaxed">
-            Crea tu cuenta para organizar cuidados y verificar tu identidad antes de continuar con Reap.
+            Create your account to organize care and verify your identity before continuing with Reap.
           </p>
           <div className="flex items-center gap-3 text-sm">
             <MessageSquare className="h-4 w-4 text-[#0097b2]" />
-            Organiza, cotiza y autoriza desde tu centro familiar
+            Organize, quote and authorize from your family hub
           </div>
         </div>
         <AuthForm mode="signup" />

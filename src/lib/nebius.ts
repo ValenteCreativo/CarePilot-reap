@@ -14,7 +14,7 @@ function parseModelJson(content: string): unknown {
   const raw = (content.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1] || content).trim();
   try { return JSON.parse(raw); } catch {
     const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
-    if (start < 0 || end < start) throw new Error('Nebius no devolvió JSON válido.');
+    if (start < 0 || end < start) throw new Error('Nebius did not return valid JSON.');
     return JSON.parse(raw.slice(start, end + 1));
   }
 }
@@ -47,17 +47,17 @@ async function generateText(prompt: string, systemPrompt?: string, schema?: Reco
     if (response.status === 429 || response.status >= 500) {
       if (attempt < 2) { await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt)); continue; }
     }
-    if (!response.ok) throw new Error(`Nebius respondió con error (${response.status}).`);
+    if (!response.ok) throw new Error(`Nebius responded with an error (${response.status}).`);
     const body = await response.json();
     const choice = body.choices?.[0];
-    if (choice?.message?.refusal) throw new Error('Nebius no pudo atender esta solicitud.');
-    if (choice?.finish_reason === 'length') throw new Error('La respuesta de Nebius quedó incompleta.');
+    if (choice?.message?.refusal) throw new Error('Nebius could not handle this request.');
+    if (choice?.finish_reason === 'length') throw new Error('The Nebius response was cut off.');
     const raw = choice?.message?.content ?? choice?.text;
     const content = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.map(part => part.text || '').join('') : '';
-    if (!content.trim()) throw new Error('Nebius devolvió una respuesta vacía.');
+    if (!content.trim()) throw new Error('Nebius returned an empty response.');
     return { content, latencyMs: Date.now() - start };
   }
-  throw new Error('Nebius agotó los reintentos.');
+  throw new Error('Nebius ran out of retries.');
 }
 
 export const nebiusService = {

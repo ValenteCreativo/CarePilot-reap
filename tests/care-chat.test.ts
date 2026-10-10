@@ -34,7 +34,7 @@ test('Cuak executes one research tool and attaches real tool data without invent
       calls++;assert.equal(query,'pañales para adulto');
       return {query,sources:[],candidates:[],errors:['REAP_NO_RESULTS'],proof:{candidates:[],expires:Date.now()+1000},signature:'test',checkoutReady:false};
     });
-    assert.equal(calls,1);assert.equal(result.research?.candidates.length,0);assert.match(result.reply,/0 fuentes/);
+    assert.equal(calls,1);assert.equal(result.research?.candidates.length,0);assert.match(result.reply,/0 sources/);
     assert.equal(result.actions.length,0);
   }finally{nebiusService.generateJson=original;}
 });
@@ -43,7 +43,7 @@ test('private search text is rejected before invoking search providers', async()
  nebiusService.generateJson=(async()=>({reply:'Buscaré.',actions:[],shopping:{mode:'research',query:'mi mamá se llama Ana y padece diabetes'}})) as typeof original;
  try{
   const result=await chatCare(input,async()=>{assert.fail('Private query must never reach research');});
-  assert.match(result.shoppingError||'',/omite nombres/);
+  assert.match(result.shoppingError||'',/omit names/);
   assert.equal(result.research,undefined);
  }finally{nebiusService.generateJson=original;}
 });

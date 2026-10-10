@@ -63,6 +63,6 @@ export const reap = {
   getCheckout: (id: string): Promise<Checkout> => reapRequest(`/agentic/checkouts/${encodeURIComponent(id)}`, checkoutSchema),
 };
 export function itemQuote(variantId: string, email: string, requiresShipping: boolean, shipping?: Shipping) {
-  if (requiresShipping && !shipping) throw new AgentError('SHIPPING_REQUIRED', 'Completa la dirección de envío.');
+  if (requiresShipping && !shipping) throw new AgentError('SHIPPING_REQUIRED', 'Complete the shipping address.');
   return { items: [{ variantId, quantity: 1 }], email, ...(shipping ? { shippingAddress: shippingSchema.parse(shipping) } : {}) };
 }
