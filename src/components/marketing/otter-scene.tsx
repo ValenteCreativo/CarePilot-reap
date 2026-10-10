@@ -6,7 +6,14 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
-export default function OtterScene({ progress }: { progress: RefObject<number> }) {
+type Lang = 'en' | 'es';
+
+const sceneCopy: Record<Lang, { aria: string; loading: string; ready: string }> = {
+  en: { aria: 'CarePilot 3D otter, your care companion', loading: 'Your companion is arriving…', ready: 'Always close to you.' },
+  es: { aria: 'Nutria 3D de CarePilot, tu compañero de cuidado', loading: 'Tu compañero está llegando…', ready: 'Siempre cerca de ti.' },
+};
+
+export default function OtterScene({ progress, lang = 'en' }: { progress: RefObject<number>; lang?: Lang }) {
   const host = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'fallback'>('loading');
   useEffect(() => {
@@ -121,7 +128,8 @@ export default function OtterScene({ progress }: { progress: RefObject<number> }
       disposeModel(pivot); renderer.dispose(); renderer.domElement.remove();
     };
   }, [progress]);
-  return <div className={`otter-scene scene-${status}`} ref={host} role="img" aria-label="Nutria 3D de CarePilot, tu compañero de cuidado">
-    {status !== 'ready' && <div className="otter-placeholder"><Image src="/images/logos/otters.png" alt="" width={480} height={400} priority /><span role="status">{status === 'loading' ? 'Tu compañero está llegando…' : 'Siempre cerca de ti.'}</span></div>}
+  const text = sceneCopy[lang];
+  return <div className={`otter-scene scene-${status}`} ref={host} role="img" aria-label={text.aria}>
+    {status !== 'ready' && <div className="otter-placeholder"><Image src="/images/logos/otters.png" alt="" width={480} height={400} priority /><span role="status">{status === 'loading' ? text.loading : text.ready}</span></div>}
   </div>;
 }

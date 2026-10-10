@@ -53,3 +53,13 @@
 @media(max-width:700px) and (max-height:740px){.care-slide,.slide-composition-1,.slide-composition-2,.slide-composition-3{top:17%}.care-eyebrow{margin-bottom:10px}.care-script{margin:8px 0}.landing-branches>span{font-size:8px;padding:3px 5px}.landing-reap{margin-top:6px}.care-model{top:68%;height:23%}.chapter-2 .care-slide h1{font-size:32px}.chapter-2 .care-description{font-size:11px;line-height:1.5}.chapter-2 .care-description p:first-child{padding-top:6px;padding-bottom:6px}.chapter-2 .care-script{font-size:14px;margin:8px 0}.chapter-2 .care-reassurance{display:none}}
 /* Keep keyboard focus from scrolling the cinematic stage internally. */
 .care-stage{overflow:clip}
+
+/* Header right cluster + EN/ES language toggle */
+.care-header-right{display:flex;align-items:center;gap:16px}
+.care-lang{display:flex;align-items:center;gap:7px;font-size:12px;letter-spacing:.5px;color:#7a9ab0}
+.care-lang button{background:none;border:0;padding:3px 2px;font:inherit;letter-spacing:.5px;color:#7a9ab0;cursor:pointer;transition:color .2s;position:relative}
+.care-lang button:hover{color:#355c74}
+.care-lang button.is-active{color:#153e59;font-weight:650}
+.care-lang button.is-active:after{content:'';position:absolute;left:0;right:0;bottom:-3px;height:2px;border-radius:2px;background:#367ba6}
+.care-lang span{color:#9db9cc;font-size:11px}
+@media(max-width:700px){.care-header-right{gap:10px}.care-lang{font-size:11px;gap:5px}}
