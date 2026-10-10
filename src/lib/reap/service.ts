@@ -49,7 +49,7 @@ async function resolveProducts(found: {id: string; category: Candidate['category
     if (v.available !== true) continue;
     // Catalog currency/price is informational, not a final quote or FX rate.
     // If shipping metadata is omitted, collect an address conservatively.
-    candidates.push({ productId: p.id, variantId: v.id, name: `${p.name} · ${v.name ?? 'Variante predeterminada'}`, merchant: p.merchant.name, category, requiresShipping: v.requiresShipping !== false, price: v.price });
+    candidates.push({ productId: p.id, variantId: v.id, name: `${p.name} · ${v.name ?? 'Default variant'}`, merchant: p.merchant.name, category, requiresShipping: v.requiresShipping !== false, price: v.price });
   }
   return candidates;
 }

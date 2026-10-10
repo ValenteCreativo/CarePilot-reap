@@ -1,4 +1,11 @@
-import CareAgent from '@/components/care/agent';
-import './agent.css';
-export const metadata = { title: 'Family shopping agent · CarePilot' };
-export default function Page() { return <CareAgent />; }
+import { redirect } from "next/navigation";
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ run?: string }>;
+}) {
+  const { run } = await searchParams;
+  redirect(
+    `/admin?view=payments${run ? `&run=${encodeURIComponent(run)}` : ""}`,
+  );
+}

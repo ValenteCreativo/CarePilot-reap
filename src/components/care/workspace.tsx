@@ -1,318 +1,1088 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { ArrowRight, CalendarDays, Check, ChevronDown, CircleDot, LoaderCircle, Plus, RefreshCw, ShieldCheck, Sparkles, Wallet, X, Zap } from 'lucide-react';
-import CareChat from './chat';
-import type { CareChatAction } from '@/lib/care/chat';
-import { demoInstruction, members as initialMembers, type Agreement, type CareMember, type CareProposalResult } from '@/lib/care/types';
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import {
+  ArrowRight,
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleDot,
+  Heart,
+  MoreHorizontal,
+  LayoutGrid,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Wallet,
+  X,
+} from "lucide-react";
+import CareChat from "./chat";
+import CareAgent from "./agent";
+import type { CareChatAction } from "@/lib/care/chat";
+import { members, type Agreement } from "@/lib/care/types";
 
-// Board stages. The whole story is left-to-right: a care need becomes an
-// authorized Reap purchase. The "Pay with Reap" -> "Resolved" transition
-// IS the agentic checkout, so Reap sits literally in the middle of the workflow.
-type Stage = 'todo' | 'doing' | 'reap' | 'done';
-type Flow = 'task' | 'appointment' | 'expense' | 'payment' | 'help' | null;
-
-const STAGES: { id: Stage; label: string; hint: string }[] = [
-  { id: 'todo', label: 'To do', hint: 'Care needs' },
-  { id: 'doing', label: 'In progress', hint: 'The team gets organized' },
-  { id: 'reap', label: 'Pay with Reap', hint: 'Agentic checkout authorized' },
-  { id: 'done', label: 'Resolved', hint: 'Purchased and up to date' },
-];
-
-const money = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'MXN' }).format(value);
-const dateLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-const localToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-
-// Where a task lives on the board, derived from its care + payment state.
-function stageOf(task: Agreement): Stage {
-  if (task.completed) return 'done';
-  if (task.budget !== null && task.approval === 'approved') return 'reap';
-  if (task.date) return 'doing';
-  return 'todo';
-}
+type View = "overview" | "calendar" | "payments";
+type Task = Agreement & { started?: boolean; recurring?: boolean };
+type Flow = "task" | "appointment" | "expense" | null;
+const team = members.filter((m) => !m.roles.includes("recipient"));
+const name = (id: string) =>
+  team.find((m) => m.id === id)?.name || "Unassigned";
+const money = (v: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "MXN" }).format(
+    v,
+  );
+const dateLabel = (d: string) =>
+  new Date(`${d}T12:00:00`).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+  });
+const localDate = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+const stageOf = (t: Task) =>
+  t.completed ? "done" : t.started ? "doing" : "todo";
+const storageKey = "carepilot-workspace-v2";
 
 export default function CareWorkspace() {
-  const [reapProof, setReapProof] = useState<{ connected: boolean; configured?: boolean; verifiedAt?: string; elapsedMs?: number; message?: string } | null>(null);
-  const [checkingReap, setCheckingReap] = useState(false);
-  const [team] = useState<CareMember[]>(initialMembers.filter(m => !m.roles.includes('recipient')));
-  const [person] = useState('Mom');
-  const [actor, setActor] = useState('vale');
-  const [tasks, setTasks] = useState<Agreement[]>([]);
+  const [view, setView] = useState<View>("overview");
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [person, setPerson] = useState("Mom");
+  const [actor, setActor] = useState("vale");
+  const [today, setToday] = useState("");
+  const [month, setMonth] = useState("");
+  const [selectedDay, setSelectedDay] = useState("");
   const [flow, setFlow] = useState<Flow>(null);
-  const [text, setText] = useState('');
-  const [draft, setDraft] = useState<CareProposalResult | null>(null);
-  const [reviewed, setReviewed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [today, setToday] = useState('');
-  const [paymentTask, setPaymentTask] = useState<Agreement | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState('');
-
+  const [notice, setNotice] = useState("");
+  const [removed, setRemoved] = useState<Task | null>(null);
+  const [purchase, setPurchase] = useState({ query: "", instruction: "" });
+  const [proof, setProof] = useState<{
+    connected: boolean;
+    message?: string;
+    verifiedAt?: string;
+  } | null>(null);
+  const [checking, setChecking] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
-
-  const name = (id: string) => team.find(m => m.id === id)?.name || 'Unassigned';
-  const pending = tasks.filter(t => !t.completed);
-  const funded = tasks.filter(t => t.budget !== null);
-  const totalBudget = funded.reduce((sum, t) => sum + (t.budget || 0), 0);
-  const approvedBudget = funded.filter(t => t.approval === 'approved').reduce((sum, t) => sum + (t.budget || 0), 0);
-  const reapReady = tasks.filter(t => stageOf(t) === 'reap');
-  const upcoming = [...pending].filter(t => t.date).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
-
-  useEffect(() => { queueMicrotask(() => setToday(localToday())); }, []);
   useEffect(() => {
-    if (flow) { opener.current = document.activeElement as HTMLElement; dialog.current?.showModal(); }
-    else { dialog.current?.close(); opener.current?.focus(); }
+    const frame = requestAnimationFrame(() => {
+      const date = localDate();
+      setToday(date);
+      setMonth(date.slice(0, 7));
+      setSelectedDay(date);
+      const params = new URL(window.location.href).searchParams;
+      const initialView = params.get("view");
+      if (
+        initialView === "overview" ||
+        initialView === "calendar" ||
+        initialView === "payments"
+      )
+        setView(initialView);
+      else if (params.has("run")) setView("payments");
+      if (params.get("query"))
+        setPurchase({
+          query: params.get("query")!.slice(0, 160),
+          instruction: "",
+        });
+      try {
+        const savedPerson = localStorage.getItem(`${storageKey}-person`);
+        if (savedPerson && savedPerson.length <= 80) setPerson(savedPerson);
+        const saved: unknown = JSON.parse(
+          localStorage.getItem(storageKey) || "[]",
+        );
+        if (Array.isArray(saved))
+          setTasks(
+            saved
+              .filter(
+                (t): t is Task =>
+                  t &&
+                  typeof t.id === "string" &&
+                  typeof t.title === "string" &&
+                  ["task", "study", "supplies", "medication"].includes(
+                    t.kind,
+                  ) &&
+                  team.some((m) => m.id === t.owner) &&
+                  team.some((m) => m.id === t.payer) &&
+                  typeof t.date === "string" &&
+                  (!t.date || /^\d{4}-\d{2}-\d{2}$/.test(t.date)) &&
+                  typeof t.completed === "boolean" &&
+                  (t.budget === null ||
+                    (typeof t.budget === "number" &&
+                      Number.isFinite(t.budget) &&
+                      t.budget >= 0)),
+              )
+              .slice(0, 200),
+          );
+      } catch {
+        /* The workspace remains usable without browser storage. */
+      }
+      setLoaded(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  useEffect(() => {
+    if (!loaded) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", view);
+    window.history.replaceState(null, "", url.pathname + url.search);
+    try {
+      localStorage.setItem(`${storageKey}-person`, person);
+    } catch {
+      /* Session stays usable. */
+    }
+  }, [view, loaded, person]);
+  useEffect(() => {
+    if (loaded)
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(tasks));
+      } catch {
+        /* Keep the current session usable. */
+      }
+  }, [tasks, loaded]);
+  useEffect(() => {
+    if (flow) {
+      opener.current = document.activeElement as HTMLElement;
+      dialog.current?.showModal();
+    } else {
+      dialog.current?.close();
+      opener.current?.focus();
+    }
   }, [flow]);
-  useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(t); }, [notice]);
-
-  // Verify the live Reap sandbox connection as soon as the panel loads, so the
-  // judges can see "Reap connected" without clicking anything.
-  useEffect(() => { void checkReap(); }, []);
+  useEffect(() => {
+    if (notice) {
+      const timer = setTimeout(() => {
+        setNotice("");
+        setRemoved(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notice]);
+  useEffect(() => {
+    void checkReap();
+  }, []);
   async function checkReap() {
-    setCheckingReap(true);
+    setChecking(true);
     try {
-      const response = await fetch('/api/care/reap/status', { signal: AbortSignal.timeout(25000) });
-      const status = await response.json();
-      setReapProof(status);
-    } catch { setReapProof({ connected: false, message: 'We could not verify the connection with Reap.' }); }
-    finally { setCheckingReap(false); }
+      const r = await fetch("/api/care/reap/status", {
+        signal: AbortSignal.timeout(25000),
+        cache: "no-store",
+      });
+      const data = await r.json();
+      setProof({ ...data, connected: r.ok && data.connected === true });
+    } catch {
+      setProof({
+        connected: false,
+        message: "Connection could not be verified. Try again.",
+      });
+    } finally {
+      setChecking(false);
+    }
   }
-
-  const open = (kind: Flow) => { setError(''); setDraft(null); setReviewed(false); setText(''); setFlow(kind); };
-  const close = () => { if (!busy) setFlow(null); };
-
-  function saveTask(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const title = String(form.get('title') || '').trim();
+  function open(kind: Flow) {
+    setFlow(kind);
+  }
+  function shop(query: string, task?: Task) {
+    setPurchase({
+      query: query.slice(0, 160),
+      instruction: `Research ${query}, coordinated by ${task ? name(task.owner) : "Guille"}, with a maximum budget of ${task?.budget ?? 700} MXN. I am the funder.`,
+    });
+    setView("payments");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function saveTask(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const title = String(data.get("title") || "").trim();
     if (!title) return;
-    const amount = String(form.get('budget') || '');
-    const task: Agreement = {
-      id: crypto.randomUUID(), title, kind: flow === 'appointment' ? 'study' : flow === 'expense' ? 'supplies' : 'task',
-      owner: String(form.get('owner')), payer: String(form.get('payer') || actor),
-      budget: amount ? Number(amount) : null, due: 'No date', date: String(form.get('date') || ''),
-      evidence: 'Logged by the family.', inference: '', clinical: flow === 'appointment',
-      approval: 'pending', completed: false,
-    };
-    setTasks(items => [...items, task]); setFlow(null);
-    setNotice(flow === 'expense' ? 'Care expense logged. Approve the budget to enable payment with Reap.' : 'Done. The team has a new to-do.');
+    const budget = String(data.get("budget") || "");
+    setTasks((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        title,
+        kind:
+          flow === "appointment"
+            ? "study"
+            : flow === "expense"
+              ? "supplies"
+              : "task",
+        owner: String(data.get("owner")),
+        payer: String(data.get("payer") || actor),
+        budget: budget ? Number(budget) : null,
+        date: String(data.get("date") || ""),
+        due: "Date to be confirmed",
+        clinical: flow === "appointment",
+        approval: "pending",
+        completed: false,
+        evidence: "Added by the family.",
+        inference: "",
+        recurring: data.get("recurring") === "on",
+      },
+    ]);
+    setFlow(null);
+    setNotice("Added to your care plan.");
   }
-
-  async function prepare(message = text) {
-    if (message.trim().length < 3 || busy) return;
-    setText(message); setBusy(true); setError(''); setDraft(null); setReviewed(false);
-    try {
-      const response = await fetch('/api/care/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'web', familyId: 'demo-family', actorId: actor, text: message, receivedAt: new Date().toISOString() }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'We could not prepare the plan. Please try again.');
-      setDraft({ ...result, proposals: result.proposals.map((p: Agreement) => ({ ...p, owner: team.some(m => m.id === p.owner) ? p.owner : actor, payer: team.some(m => m.id === p.payer) ? p.payer : actor })) });
-    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Check your connection and try again.'); }
-    finally { setBusy(false); }
-  }
-
-  function saveDraft() {
-    if (!draft || !reviewed || !draft.proposals.length) return;
-    if (draft.proposals.some(p => !p.title.trim() || !p.owner || !p.payer)) { setError('Complete the title and the responsible people.'); return; }
-    setTasks(items => [...items, ...draft.proposals.map(p => ({ ...p, completed: false, approval: 'pending' as const, date: '' }))]);
-    setFlow(null); setNotice('Your plan is ready. No payment has been authorized.');
-  }
-
-  function applyChatActions(actions: CareChatAction[]): boolean {
-    if (actions.some(a => (a.owner && !team.some(m => m.id === a.owner)) || (a.payer && !team.some(m => m.id === a.payer)) || (a.type === 'update_task' && !tasks.some(t => t.id === a.taskId)))) return false;
-    const additions: Agreement[] = actions.filter(a => a.type === 'create_task').map(a => ({
-      id: crypto.randomUUID(), title: a.title, kind: a.kind, owner: a.owner, payer: a.payer,
-      budget: a.budget, due: a.due || 'Date to be confirmed', date: a.date,
-      clinical: a.clinical || a.kind === 'study' || a.kind === 'medication', evidence: 'Prepared with Cuak and reviewed by the family.', inference: a.reason,
-      approval: 'pending', completed: false,
-    }));
-    setTasks(current => [...current.map(task => {
-      const change = actions.find(a => a.type === 'update_task' && a.taskId === task.id);
-      return change ? { ...task, owner: change.owner, date: change.date, due: change.due || task.due } : task;
-    }), ...additions]);
-    setNotice('Cuak updates applied to your space.');
+  function apply(actions: CareChatAction[]) {
+    if (
+      actions.some(
+        (a) =>
+          (a.owner && !team.some((m) => m.id === a.owner)) ||
+          (a.payer && !team.some((m) => m.id === a.payer)) ||
+          (a.type === "update_task" && !tasks.some((t) => t.id === a.taskId)),
+      )
+    )
+      return false;
+    const rename = actions.find((a) => a.type === "rename_person");
+    if (rename) setPerson(rename.title);
+    setTasks((current) => [
+      ...current.map((t) => {
+        const a = actions.find(
+          (a) => a.type === "update_task" && a.taskId === t.id,
+        );
+        return a
+          ? { ...t, owner: a.owner, date: a.date, due: a.due || t.due }
+          : t;
+      }),
+      ...actions
+        .filter((a) => a.type === "create_task")
+        .map((a) => ({
+          id: crypto.randomUUID(),
+          title: a.title,
+          kind: a.kind,
+          owner: a.owner,
+          payer: a.payer,
+          budget: a.budget,
+          date: a.date,
+          due: a.due || "Date to be confirmed",
+          clinical: a.clinical,
+          approval: "pending" as const,
+          completed: false,
+          evidence: "Reviewed with Quak.",
+          inference: a.reason,
+        })),
+    ]);
+    setNotice("Your care plan has been updated.");
     return true;
   }
-
-  function approveBudget(id: string) {
-    setTasks(items => items.map(t => t.id === id ? { ...t, approval: 'approved' } : t));
-    setNotice('Budget approved. Ready for the agentic checkout with Reap. No charge yet.');
+  function loadExample() {
+    if (!today || tasks.length) return;
+    const base = {
+      payer: "vale",
+      due: "This week",
+      approval: "pending" as const,
+      completed: false,
+      evidence: "Sample care plan",
+      inference: "",
+      date: today,
+    };
+    setTasks([
+      {
+        ...base,
+        id: crypto.randomUUID(),
+        title: "Coordinate Mom’s therapy visit",
+        kind: "study",
+        owner: "guille",
+        budget: 450,
+        clinical: true,
+      },
+      {
+        ...base,
+        id: crypto.randomUUID(),
+        title: "Restock weekly hygiene supplies",
+        kind: "supplies",
+        owner: "guille",
+        budget: 700,
+        clinical: false,
+        recurring: true,
+      },
+      {
+        ...base,
+        id: crypto.randomUUID(),
+        title: "Check in and prepare lunch",
+        kind: "task",
+        owner: "vale",
+        budget: null,
+        clinical: false,
+        started: true,
+      },
+    ]);
+    setNotice("Sample plan loaded. These are example tasks, not purchases.");
   }
-  function moveToDoing(id: string) {
-    setTasks(items => items.map(t => t.id === id ? { ...t, date: t.date || today } : t));
+  const pending = tasks.filter((t) => !t.completed);
+  const expenses = tasks.filter((t) => t.budget !== null);
+  const budget = expenses.reduce((sum, t) => sum + (t.budget || 0), 0);
+  const upcoming = pending
+    .filter((t) => t.date && t.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 3);
+  const monthDate = new Date(`${month || "2026-01"}-01T12:00:00`);
+  const days = new Date(
+    monthDate.getFullYear(),
+    monthDate.getMonth() + 1,
+    0,
+  ).getDate();
+  const offset = (monthDate.getDay() + 6) % 7;
+  function changeMonth(n: number) {
+    const d = new Date(monthDate);
+    d.setMonth(d.getMonth() + n);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
   }
-
-  function stageCard(task: Agreement) {
-    const stage = stageOf(task);
-    return <article className={`board-card stage-${stage}`} key={task.id}>
-      <div className="board-card-top">
-        <span className={`card-kind kind-${task.kind}`}>{task.kind === 'study' ? <><CalendarDays size={12} /> Appointment</> : task.kind === 'medication' ? <><Wallet size={12} /> Medication</> : task.kind === 'supplies' ? <><RefreshCw size={12} /> Supplies</> : 'Task'}</span>
-        <button className="card-check" aria-label={`${task.completed ? 'Reopen' : 'Mark resolved'} ${task.title}`} aria-pressed={task.completed} onClick={() => setTasks(items => items.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t))}>{task.completed ? <Check size={15} /> : <span />}</button>
-      </div>
-      <h4>{task.title}</h4>
-      <p className="card-meta"><span className="mini-avatar">{name(task.owner)[0]}</span>{name(task.owner)}{task.date && <><span className="card-dot">·</span>{dateLabel(task.date)}</>}</p>
-      {task.budget !== null && <div className="card-budget"><Wallet size={14} /><span>{money(task.budget)}<small>covered by {name(task.payer)}</small></span></div>}
-      {task.clinical && <small className="card-clinical">Confirm the instruction with the healthcare professional.</small>}
-      <div className="card-actions">
-        {stage === 'todo' && <button className="card-step" onClick={() => moveToDoing(task.id)}>Start <ArrowRight size={13} /></button>}
-        {task.budget !== null && task.approval === 'pending' && task.payer === actor && <button className="card-step card-reap" onClick={() => approveBudget(task.id)}><ShieldCheck size={13} /> Approve budget</button>}
-        {task.budget !== null && task.approval === 'pending' && task.payer !== actor && <small>Approved by {name(task.payer)}</small>}
-        {stage === 'reap' && <button className="card-step card-reap" onClick={() => { setPaymentStatus(''); setPaymentTask(task); open('payment'); }}><Zap size={13} /> Pay with Reap</button>}
-      </div>
-    </article>;
+  function removeTask(task: Task) {
+    setRemoved(task);
+    setTasks((current) => current.filter((t) => t.id !== task.id));
+    setNotice("Task removed from the plan.");
   }
-
-  const reapConnected = reapProof?.connected;
-
-  return <div className="care-os">
-    <header className="os-header">
-      <Link href="/" className="os-brand"><Image src="/images/logos/otters.png" alt="" width={40} height={40} />carepilot<span>copilot for care</span></Link>
-      <div className="os-header-right">
-        <span className={`os-reap-chip ${reapConnected ? 'is-live' : checkingReap ? 'is-checking' : 'is-off'}`}>
-          {checkingReap ? <LoaderCircle size={13} className="care-spin" /> : <CircleDot size={13} />}
-          Reap sandbox {reapConnected ? 'connected' : checkingReap ? 'verifying…' : 'not verified'}
-        </span>
-        <label className="os-identity"><span className="mini-avatar">{name(actor)[0]}</span><select aria-label="Using the demo as" value={actor} onChange={e => setActor(e.target.value)}>{team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
-      </div>
-    </header>
-
-    <main className="os-main">
-      {/* HERO: one-shot value prop. Cuak (Nebius agent) + Reap are the protagonists. */}
-      <section className="os-hero">
-        <div className="os-hero-copy">
-          <span className="os-lockup"><strong>cuak</strong><i>×</i><em>reap</em></span>
-          <h1>Caring for {person} means <u>a lot of payments</u>. Cuak automates them with Reap.</h1>
-          <p>Cuak is our Nebius-powered agent: it schedules appointments, searches products and <strong>triggers the purchase with Reap</strong>. Reap is the agentic payments infrastructure that makes restocking medicine and supplies never need a person again.</p>
-          <div className="os-hero-actions">
-            <button className="os-primary" onClick={() => document.querySelector<HTMLButtonElement>('.cuak-launcher')?.click()}><Sparkles size={17} /> Ask Cuak</button>
-            <button className="os-ghost" onClick={() => open('expense')}><Wallet size={16} /> New care expense</button>
+  function card(t: Task) {
+    return (
+      <article
+        className={`task-card ${t.completed ? "is-done" : ""}`}
+        key={t.id}
+      >
+        <div className="task-tags">
+          <span className={`task-tag tag-${t.kind}`}>
+            {t.kind === "study"
+              ? "Appointment"
+              : t.kind === "supplies"
+                ? "Supplies"
+                : t.kind === "medication"
+                  ? "Medication"
+                  : "Daily care"}
+          </span>
+          {t.recurring && (
+            <span title="Weekly restock reminder" className="repeat-tag">
+              <RefreshCw size={12} /> Weekly
+            </span>
+          )}
+          <details className="task-menu">
+            <summary aria-label={`Options for ${t.title}`}>
+              <MoreHorizontal size={16} />
+            </summary>
+            <button onClick={() => removeTask(t)}>Remove task</button>
+          </details>
+        </div>
+        <h3>{t.title}</h3>
+        <div className="task-meta">
+          <span className="avatar">{name(t.owner)[0]}</span>
+          {name(t.owner)}
+          {t.date && (
+            <span className={t.date < today && !t.completed ? "overdue" : ""}>
+              <CalendarDays size={12} />
+              {dateLabel(t.date)}
+            </span>
+          )}
+        </div>
+        {t.budget !== null && (
+          <div className="task-budget">
+            <Wallet size={14} />
+            <strong>{money(t.budget)}</strong>
+            <small>Planned · {name(t.payer)}</small>
+          </div>
+        )}
+        <div className="task-actions">
+          {!t.completed && (
+            <button
+              onClick={() =>
+                setTasks((current) =>
+                  current.map((item) =>
+                    item.id === t.id
+                      ? { ...item, started: true, completed: !!item.started }
+                      : item,
+                  ),
+                )
+              }
+            >
+              {t.started ? (
+                <>
+                  <Check size={14} /> Complete
+                </>
+              ) : (
+                <>
+                  Start task <ArrowRight size={14} />
+                </>
+              )}
+            </button>
+          )}
+          {t.completed && (
+            <button
+              onClick={() =>
+                setTasks((current) =>
+                  current.map((item) =>
+                    item.id === t.id
+                      ? { ...item, completed: false, started: false }
+                      : item,
+                  ),
+                )
+              }
+            >
+              Reopen
+            </button>
+          )}
+          {t.kind === "supplies" && !t.completed && (
+            <button onClick={() => shop(t.title, t)}>Find products</button>
+          )}
+        </div>
+      </article>
+    );
+  }
+  return (
+    <div className="care-workspace" lang="en">
+      <aside className="workspace-sidebar">
+        <Link href="/" className="workspace-brand">
+          <Image src="/images/logos/otters.png" alt="" width={39} height={39} />
+          carepilot<span>CARE, TOGETHER.</span>
+        </Link>
+        <div className="care-profile">
+          <span className="person-icon">
+            <Heart size={21} />
+          </span>
+          <div>
+            <small>YOUR CARE CIRCLE</small>
+            <strong>{person}’s care</strong>
+            <span>{team.length} people, one shared plan</span>
           </div>
         </div>
-        <div className="os-hero-flow" aria-hidden="true">
-          <span className="flow-node"><Sparkles size={18} /> Cuak understands the need</span>
-          <ArrowRight size={16} className="flow-arrow" />
-          <span className="flow-node"><CalendarDays size={18} /> Schedules and organizes</span>
-          <ArrowRight size={16} className="flow-arrow" />
-          <span className="flow-node flow-reap"><Zap size={18} /> Reap pays for the care</span>
+        <nav aria-label="Care workspace">
+          {(
+            [
+              { id: "overview", title: "Care board", icon: LayoutGrid },
+              { id: "calendar", title: "Calendar", icon: CalendarDays },
+              { id: "payments", title: "Budget & payments", icon: Wallet },
+            ] as const
+          ).map((v) => (
+            <button
+              key={v.id}
+              className={view === v.id ? "active" : ""}
+              aria-current={view === v.id ? "page" : undefined}
+              onClick={() => setView(v.id)}
+            >
+              <v.icon size={19} />
+              {v.title}
+              {v.id === "overview" && pending.length > 0 && (
+                <span>{pending.length}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="team-avatars">
+            {team.map((m) => (
+              <span className="avatar" key={m.id} title={m.name}>
+                {m.name[0]}
+              </span>
+            ))}
+            <span>Your care team</span>
+          </div>
+          <p>
+            A little less to carry.
+            <br />A little more time together.
+          </p>
+          <Link href="/">
+            Back to home <ArrowRight size={14} />
+          </Link>
         </div>
-      </section>
-
-      {/* LIVE PROOF STRIP: Reap + Nebius visible at a glance. */}
-      <section className="os-metrics">
-        <div className={`os-metric metric-reap ${reapConnected ? 'is-live' : ''}`}>
-          <span className="metric-label"><Zap size={14} /> Reap · agentic payments</span>
-          <strong>{reapConnected ? 'Connected' : checkingReap ? 'Verifying' : 'Not verified'}</strong>
-          <small>{reapConnected ? `SG sandbox · ${reapProof?.elapsedMs ?? '—'} ms` : 'Care payment infrastructure'}</small>
-          <button className="metric-refresh" onClick={checkReap} disabled={checkingReap} aria-label="Re-check Reap"><RefreshCw size={13} className={checkingReap ? 'care-spin' : ''} /></button>
-        </div>
-        <div className="os-metric">
-          <span className="metric-label"><Sparkles size={14} /> Cuak · Nebius agent</span>
-          <strong>Active</strong>
-          <small>Schedules · researches · buys</small>
-        </div>
-        <div className="os-metric">
-          <span className="metric-label"><Wallet size={14} /> Care budget</span>
-          <strong>{money(totalBudget)}</strong>
-          <small>{money(approvedBudget)} ready for Reap</small>
-        </div>
-        <div className="os-metric">
-          <span className="metric-label"><RefreshCw size={14} /> Automatable purchases</span>
-          <strong>{reapReady.length}</strong>
-          <small>awaiting agentic checkout</small>
-        </div>
-      </section>
-
-      {/* CALENDAR STRIP */}
-      <section className="os-calendar">
-        <div className="os-section-head"><h2><CalendarDays size={17} /> Upcoming appointments and refills</h2><button className="os-ghost small" onClick={() => open('appointment')}><Plus size={15} /> Schedule</button></div>
-        <div className="calendar-rail">
-          {upcoming.length ? upcoming.map(t => <div className="calendar-chip" key={t.id}><span className="calendar-date">{t.date ? dateLabel(t.date) : 'To be set'}</span><strong>{t.title}</strong><small>{name(t.owner)}</small></div>)
-            : <div className="calendar-empty"><CalendarDays size={20} /> No dates yet. Ask Cuak to schedule {person}&apos;s next appointment.</div>}
-        </div>
-      </section>
-
-      {/* THE BOARD: a care need flows left to right into a Reap purchase. */}
-      <section className="os-board-wrap">
-        <div className="os-section-head"><h2>Care board</h2><p>From need to payment. Reap lives at the center of the flow.</p></div>
-        <div className="os-board">
-          {STAGES.map(stage => {
-            const items = tasks.filter(t => stageOf(t) === stage.id);
-            return <div className={`board-col col-${stage.id}`} key={stage.id}>
-              <header className="board-col-head">
-                <div><strong>{stage.label}</strong><small>{stage.hint}</small></div>
-                <span className="board-count">{items.length}</span>
-              </header>
-              {stage.id === 'reap' && <div className="board-reap-flag"><Zap size={13} /> Reap agentic checkout</div>}
-              <div className="board-col-body">
-                {items.length ? items.map(stageCard) : <div className="board-col-empty">{stage.id === 'todo' ? 'Add a need or ask Cuak for it.' : stage.id === 'reap' ? 'Approve a budget to enable payment with Reap.' : '—'}</div>}
+      </aside>
+      <div className="workspace-body">
+        <header className="workspace-topbar">
+          <span>
+            <span className="breadcrumb">Your workspace / </span>
+            {view === "calendar"
+              ? "Calendar"
+              : view === "payments"
+                ? "Budget & payments"
+                : "Care board"}
+          </span>
+          <label className="identity">
+            <span className="avatar">{name(actor)[0]}</span>
+            <select
+              aria-label="Plan as"
+              value={actor}
+              onChange={(e) => setActor(e.target.value)}
+            >
+              {team.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </header>
+        <main className="workspace-main">
+          <div className="page-heading">
+            <div>
+              <span className="eyebrow">
+                {view === "overview"
+                  ? "SMALL STEPS. SHARED CARE."
+                  : view === "calendar"
+                    ? "MAKE ROOM FOR WHAT MATTERS."
+                    : "CARE HAS A COST. SHARE THE PLAN."}
+              </span>
+              <h1>
+                {view === "overview"
+                  ? "Good care starts together."
+                  : view === "calendar"
+                    ? "A clearer view of the week."
+                    : "Less worry about the next expense."}
+              </h1>
+              <p>
+                {view === "overview"
+                  ? `One place for the things ${person} needs, and the people who make them happen.`
+                  : view === "calendar"
+                    ? "Appointments, daily care and restock reminders, in one shared calendar."
+                    : "Plan care costs, find supplies and approve purchases without leaving your workspace."}
+              </p>
+            </div>
+            <button
+              className="primary-action"
+              onClick={() =>
+                open(
+                  view === "calendar"
+                    ? "appointment"
+                    : view === "payments"
+                      ? "expense"
+                      : "task",
+                )
+              }
+            >
+              <Plus size={17} />
+              {view === "calendar"
+                ? "Add appointment"
+                : view === "payments"
+                  ? "Plan an expense"
+                  : "Add a task"}
+            </button>
+          </div>
+          <div
+            className={
+              view === "payments" ? "payments-layout" : "workspace-grid"
+            }
+          >
+            <div className="workspace-content">
+              <div hidden={view !== "overview"}>
+                <CareChat
+                  person={person}
+                  actor={actor}
+                  today={today}
+                  team={team}
+                  tasks={tasks}
+                  onApply={apply}
+                  onShop={shop}
+                />
               </div>
-              {stage.id === 'todo' && <button className="board-add" onClick={() => open('task')}><Plus size={14} /> Add</button>}
-            </div>;
-          })}
-        </div>
-      </section>
-
-      {/* REAP SPOTLIGHT: the sponsor, as the payment infrastructure for care. */}
-      <section className="os-reap-spot">
-        <div className="os-reap-spot-head">
-          <span className="os-lockup big"><em>reap</em><i>×</i><strong>carepilot</strong></span>
-          <span className={`os-reap-chip ${reapConnected ? 'is-live' : 'is-off'}`}>{reapConnected ? <ShieldCheck size={13} /> : <CircleDot size={13} />} {reapConnected ? 'Sandbox verified' : 'Connection pending'}</span>
-        </div>
-        <h2>Reap is the infrastructure that makes care pay for itself.</h2>
-        <p>Every medicine that runs out, every recurring supply, every expense someone does by hand today: Cuak prepares it and Reap executes it with an agentic checkout, with your authorization and within budget.</p>
-        <ol className="reap-steps">
-          <li><span>01</span><div><strong>Cuak interprets and searches</strong><p>Nebius agent + real research with Tavily and the Reap catalog.</p></div></li>
-          <li><span>02</span><div><strong>Real quote from Reap</strong><p>Final price and currency from a compatible merchant. Never a made-up price.</p></div></li>
-          <li><span>03</span><div><strong>You authorize within budget</strong><p>Whoever covers the expense approves; Reap checks it is not exceeded.</p></div></li>
-          <li><span>04</span><div><strong>Agentic checkout executed</strong><p>Reap completes the purchase. Care stops needing a person.</p></div></li>
-        </ol>
-        <div className="os-reap-spot-actions">
-          <Link className="os-primary" href="/care-agent"><Zap size={17} /> Open agentic checkout with Reap</Link>
-          <Link className="os-ghost" href="/care-shop">Research and quote products <ArrowRight size={15} /></Link>
-        </div>
-      </section>
-
-      <CareChat person={person} actor={actor} today={today || localToday()} team={team} tasks={tasks} onApply={applyChatActions} />
-
-      <footer className="os-footer"><span><Sparkles size={13} /> Cuak + Reap · caring without payments holding you back.</span><small>Demo sandbox · changes persist until reload. No real charges.</small></footer>
-    </main>
-
-    <dialog ref={dialog} className="care-dialog" onCancel={e => { e.preventDefault(); close(); }} onClick={e => { if (e.target === e.currentTarget) close(); }} aria-labelledby="flow-title">
-      <div className="dialog-body">
-        <button className="dialog-close" aria-label="Close" onClick={close} disabled={busy}><X size={22} /></button>
-        <span className="dialog-icon">{flow === 'appointment' ? <CalendarDays size={26} /> : flow === 'expense' || flow === 'payment' ? <Wallet size={26} /> : flow === 'help' ? <Sparkles size={26} /> : <Plus size={28} />}</span>
-        <h2 id="flow-title">{flow === 'appointment' ? 'An appointment, all clear.' : flow === 'expense' ? 'A care expense.' : flow === 'payment' ? 'Agentic payment with Reap.' : flow === 'help' ? draft ? 'Let us review the plan.' : 'Tell us what you need.' : 'A step to care.'}</h2>
-        <p className="dialog-subtitle">{flow === 'payment' ? `For ${paymentTask?.title ?? person}. Reap executes the purchase with your authorization.` : flow === 'help' ? 'You review and decide what to save.' : `For ${person}. Just the essentials.`}</p>
-
-        {flow !== 'help' && flow !== 'payment' && <form onSubmit={saveTask} className="simple-form">
-          <label>{flow === 'appointment' ? 'What appointment or study is it?' : flow === 'expense' ? 'What do you need to cover?' : 'What needs to be done?'}<input name="title" placeholder={flow === 'appointment' ? 'e.g. Follow-up consultation' : flow === 'expense' ? 'e.g. Diapers, medication, therapy' : 'e.g. Pick up the test results'} maxLength={140} required autoFocus /></label>
-          <label>Who handles it?<select name="owner" defaultValue={actor}>{team.map(m => <option key={m.id} value={m.id}>{m.name}{m.id === actor ? ' (me)' : ''}</option>)}</select></label>
-          <label>{flow === 'appointment' ? 'When is the appointment?' : 'By when? (optional)'}<input type="date" name="date" defaultValue={flow === 'appointment' ? today : ''} required={flow === 'appointment'} /></label>
-          {flow === 'expense' && <div className="expense-fields visible-expense"><label>How much can you allocate? · MXN<input name="budget" type="number" step="0.01" min="0.01" max="1000000" placeholder="Maximum budget" required /></label><label>Who covers the expense?<select name="payer" defaultValue={actor}>{team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label><small>Creates a budget to approve. Once approved it is ready for payment with Reap. This is not a charge.</small></div>}
-          {flow !== 'expense' && <details className="optional-expense"><summary><Wallet size={17} /> Is there an expense to organize? <ChevronDown size={15} /></summary><div className="expense-fields"><label>Spending limit · MXN<input name="budget" type="number" step="0.01" min="0" max="1000000" placeholder="e.g. 700" /></label><label>Who covers it?<select name="payer" defaultValue={actor}>{team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label></div><small>Only to organize the budget. No charge is made.</small></details>}
-          {flow === 'appointment' && <label className="review-consent"><input type="checkbox" required /> I confirmed the date and the instruction with the healthcare professional.</label>}
-          <button className="os-primary full-action" type="submit">{flow === 'appointment' ? 'Save appointment' : flow === 'expense' ? 'Save expense' : 'Save to-do'}<Check size={18} /></button>
-        </form>}
-
-        {flow === 'payment' && <div className="payment-preview">
-          {paymentTask && <div className="payment-context"><strong>{paymentTask.title}</strong><p>Maximum budget: {money(paymentTask.budget!)} MXN · covered by {name(paymentTask.payer)}</p><small>Planned amount, pending a real quote from Reap.</small></div>}
-          <span className="os-lockup"><strong>cuak</strong><i>×</i><em>reap</em></span>
-          <ol className="reap-steps compact"><li><span>01</span><div><strong>Cuak prepares the purchase</strong><p>Interprets the need and researches compatible products.</p></div></li><li><span>02</span><div><strong>Reap quotes and validates the budget</strong><p>Final price from a compatible merchant, within your limit.</p></div></li><li><span>03</span><div><strong>You authorize and Reap pays</strong><p>Agentic checkout executed with your consent.</p></div></li></ol>
-          <div className="payment-availability"><ShieldCheck size={19} /><p>The full agentic checkout (identity, quote and authorization) lives on the Reap screen. Here we verify the real sandbox connection; it does not generate charges.</p></div>
-          <button className="os-primary full-action" disabled={checkingReap} onClick={checkReap}>{checkingReap ? <LoaderCircle className="care-spin" size={18} /> : <ShieldCheck size={18} />} Verify connection with Reap</button>
-          {reapProof && <div className={reapProof.connected ? 'payment-result reap-proof' : 'payment-result'} role="status"><strong>{reapProof.connected ? 'Reap sandbox: connection verified' : 'Connection not verified'}</strong><p>{reapProof.message || paymentStatus}</p>{reapProof.connected && reapProof.verifiedAt && <><small>Verified: {new Date(reapProof.verifiedAt).toLocaleString('en-US')} · {reapProof.elapsedMs} ms</small><details><summary>View technical evidence</summary><code>GET /agentic/enrollments · valid response from Reap</code></details></>}</div>}
-          <Link className="os-ghost full-action" href="/care-agent"><Zap size={16} /> Run the full agentic checkout</Link>
-        </div>}
-
-        {flow === 'help' && (!draft
-          ? <form className="simple-form" onSubmit={e => { e.preventDefault(); prepare(); }}><label htmlFor="care-message">What does {person} need?<textarea id="care-message" rows={5} value={text} maxLength={4000} onChange={e => setText(e.target.value)} placeholder="e.g. We are out of diapers for the week and need a follow-up appointment. Guille takes her, I cover the expenses." required autoFocus /></label>{error && <p className="form-error" role="alert">{error}</p>}<button className="os-primary full-action" disabled={busy || text.trim().length < 3}>{busy ? <><LoaderCircle className="care-spin" size={18} /> Organizing…</> : <>Prepare my plan <ArrowRight size={18} /></>}</button><button type="button" className="text-action example-action" onClick={() => prepare(demoInstruction)} disabled={busy}>See an example with Mom</button></form>
-          : <div className="draft-review">{draft.proposals.map((proposal, index) => <section className="draft-item" key={proposal.id}><span>STEP {index + 1}</span><label>What needs to be done<input aria-label={`To-do ${index + 1}`} value={proposal.title} onChange={e => { setReviewed(false); setDraft(d => d && ({ ...d, proposals: d.proposals.map(p => p.id === proposal.id ? { ...p, title: e.target.value } : p) })); }} /></label><label>Who handles it<select value={proposal.owner} onChange={e => { setReviewed(false); setDraft(d => d && ({ ...d, proposals: d.proposals.map(p => p.id === proposal.id ? { ...p, owner: e.target.value } : p) })); }}>{team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label><details><summary>Date, budget and details <ChevronDown size={14} /></summary><div className="expense-fields"><label>Deadline<input value={proposal.due} onChange={e => { setReviewed(false); setDraft(d => d && ({ ...d, proposals: d.proposals.map(p => p.id === proposal.id ? { ...p, due: e.target.value } : p) })); }} /></label><label>Maximum budget · MXN<input type="number" min="0" max="1000000" value={proposal.budget ?? ''} onChange={e => { setReviewed(false); setDraft(d => d && ({ ...d, proposals: d.proposals.map(p => p.id === proposal.id ? { ...p, budget: e.target.value ? Number(e.target.value) : null } : p) })); }} /></label><label>Who covers the expense<select value={proposal.payer} onChange={e => { setReviewed(false); setDraft(d => d && ({ ...d, proposals: d.proposals.map(p => p.id === proposal.id ? { ...p, payer: e.target.value } : p) })); }}>{team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label><small>{proposal.evidence}</small><small>{proposal.inference}</small></div></details>{proposal.clinical && <small className="card-clinical">Review this instruction with the healthcare professional.</small>}<button className="text-action remove-draft" onClick={() => { setReviewed(false); setDraft(d => d && ({ ...d, proposals: d.proposals.filter(p => p.id !== proposal.id) })); }}>Remove this step</button></section>)}{draft.proposals.length === 0 && <p>No steps left. Describe what you need again.</p>}<label className="review-consent"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} /> I reviewed the tasks and instructions. I want to save this plan, without authorizing payments.</label>{error && <p className="form-error" role="alert">{error}</p>}<button className="os-primary full-action" disabled={!reviewed || !draft.proposals.length} onClick={saveDraft}>Save my plan <Check size={18} /></button><button className="text-action example-action" onClick={() => { setDraft(null); setReviewed(false); }}>Back to message</button></div>)}
+              {view === "overview" && (
+                <>
+                  <section className="care-board">
+                    <div className="section-heading">
+                      <div>
+                        <h2>
+                          The care plan <span>{tasks.length}</span>
+                        </h2>
+                        <p>Who’s doing what. One step at a time.</p>
+                      </div>
+                      {!tasks.length && (
+                        <button
+                          className="text-action"
+                          disabled={!loaded}
+                          onClick={loadExample}
+                        >
+                          Try a sample plan <ArrowRight size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="board-columns">
+                      {[
+                        {
+                          id: "todo",
+                          title: "To do",
+                          empty: "What does Mom need next?",
+                        },
+                        {
+                          id: "doing",
+                          title: "In progress",
+                          empty: "Start a task when you’re ready.",
+                        },
+                        {
+                          id: "done",
+                          title: "Done",
+                          empty: "Every little thing counts.",
+                        },
+                      ].map((stage) => (
+                        <section
+                          className={`board-column column-${stage.id}`}
+                          key={stage.id}
+                        >
+                          <header>
+                            <span className="stage-dot" />
+                            <h3>{stage.title}</h3>
+                            <span>
+                              {
+                                tasks.filter((t) => stageOf(t) === stage.id)
+                                  .length
+                              }
+                            </span>
+                          </header>
+                          <div>
+                            {tasks
+                              .filter((t) => stageOf(t) === stage.id)
+                              .map(card)}
+                            {!tasks.some((t) => stageOf(t) === stage.id) && (
+                              <div className="board-empty">
+                                <CircleDot size={22} />
+                                <p>{stage.empty}</p>
+                              </div>
+                            )}
+                          </div>
+                          {stage.id === "todo" && (
+                            <button
+                              className="board-add"
+                              onClick={() => open("task")}
+                            >
+                              <Plus size={15} /> Add a task
+                            </button>
+                          )}
+                        </section>
+                      ))}
+                    </div>
+                  </section>
+                  <div className="care-note">
+                    <Heart size={16} />
+                    <p>
+                      Care is more than a checklist. Your team handles the
+                      details, so you can be present.
+                    </p>
+                  </div>
+                </>
+              )}
+              {view === "calendar" && (
+                <section className="calendar-panel">
+                  <div className="section-heading">
+                    <h2>
+                      {monthDate.toLocaleDateString("en-US", {
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </h2>
+                    <div className="month-controls">
+                      <button
+                        aria-label="Previous month"
+                        onClick={() => changeMonth(-1)}
+                      >
+                        <ChevronLeft size={18} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMonth(today.slice(0, 7));
+                          setSelectedDay(today);
+                        }}
+                      >
+                        Today
+                      </button>
+                      <button
+                        aria-label="Next month"
+                        onClick={() => changeMonth(1)}
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="month-grid">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
+                      (day) => (
+                        <span className="weekday" key={day}>
+                          {day}
+                        </span>
+                      ),
+                    )}
+                    {Array.from({ length: offset }, (_, i) => (
+                      <span className="calendar-blank" key={`blank${i}`} />
+                    ))}
+                    {Array.from({ length: days }, (_, i) => {
+                      const date = `${month}-${String(i + 1).padStart(2, "0")}`;
+                      const items = tasks.filter((t) => t.date === date);
+                      return (
+                        <button
+                          key={date}
+                          className={`calendar-day ${date === today ? "is-today" : ""} ${date === selectedDay ? "is-selected" : ""}`}
+                          aria-label={`${dateLabel(date)}, ${items.length} tasks`}
+                          aria-pressed={date === selectedDay}
+                          onClick={() => setSelectedDay(date)}
+                        >
+                          <span>{i + 1}</span>
+                          <div className="day-events">
+                            {items.slice(0, 2).map((t) => (
+                              <small key={t.id}>{t.title}</small>
+                            ))}
+                            {items.length > 2 && (
+                              <small>+{items.length - 2} more</small>
+                            )}
+                          </div>
+                          {items.length > 0 && <i />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="selected-day">
+                    <h3>
+                      {selectedDay ? dateLabel(selectedDay) : "Choose a day"}{" "}
+                      <span>
+                        {tasks.filter((t) => t.date === selectedDay).length}{" "}
+                        planned
+                      </span>
+                    </h3>
+                    {tasks.filter((t) => t.date === selectedDay).map(card)}
+                    {!tasks.some((t) => t.date === selectedDay) && (
+                      <p>Nothing planned. A little breathing room.</p>
+                    )}
+                    <button
+                      className="text-action"
+                      onClick={() => open("appointment")}
+                    >
+                      <Plus size={15} /> Add to this day
+                    </button>
+                  </div>
+                </section>
+              )}
+              <div hidden={view !== "payments"}>
+                <div className="finance-summary">
+                  <div>
+                    <span>Planned care budget</span>
+                    <strong>
+                      {money(budget)} <small>MXN</small>
+                    </strong>
+                    <p>{expenses.length} expenses in your plan · not charged</p>
+                  </div>
+                  <div>
+                    <span>Recurring reminders</span>
+                    <strong>
+                      {tasks.filter((t) => t.recurring && !t.completed).length}
+                    </strong>
+                    <p>Weekly supplies to review</p>
+                  </div>
+                  <div>
+                    <span>Payment provider</span>
+                    <strong className="reap-wordmark">
+                      reap{" "}
+                      <span
+                        className={`connection-dot ${proof?.connected ? "connected" : ""}`}
+                      />
+                    </strong>
+                    <p>
+                      {checking
+                        ? "Checking sandbox…"
+                        : proof?.connected
+                          ? "Sandbox connection verified"
+                          : "Sandbox connection not verified"}
+                    </p>
+                    <button
+                      className="text-action"
+                      onClick={checkReap}
+                      disabled={checking}
+                    >
+                      <RefreshCw size={12} /> Check connection
+                    </button>
+                  </div>
+                </div>
+                <section className="expense-list">
+                  <div className="section-heading">
+                    <div>
+                      <h2>What care needs</h2>
+                      <p>
+                        Planning a budget is separate from authorizing a
+                        purchase.
+                      </p>
+                    </div>
+                  </div>
+                  {expenses.length ? (
+                    expenses.map((t) => (
+                      <div className="expense-row" key={t.id}>
+                        <span className={`expense-icon tag-${t.kind}`}>
+                          <Wallet size={19} />
+                        </span>
+                        <div>
+                          <strong>{t.title}</strong>
+                          <span>
+                            {name(t.owner)} coordinates · {name(t.payer)} covers
+                            the cost
+                            {t.recurring ? " · weekly reminder" : ""}
+                          </span>
+                        </div>
+                        <strong>{money(t.budget || 0)}</strong>
+                        {t.kind === "supplies" ? (
+                          <button
+                            className="secondary-action"
+                            onClick={() => shop(t.title, t)}
+                          >
+                            Find & quote <ArrowRight size={14} />
+                          </button>
+                        ) : (
+                          <span className="planned-label">Planned expense</span>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="expenses-empty">
+                      <Wallet size={26} />
+                      <p>
+                        No expenses planned yet. Add medication, therapy,
+                        nutrition or supplies to see the full picture.
+                      </p>
+                      <button
+                        className="text-action"
+                        onClick={() => open("expense")}
+                      >
+                        Plan your first expense <Plus size={15} />
+                      </button>
+                    </div>
+                  )}
+                </section>
+                <CareAgent
+                  instruction={purchase.instruction}
+                  productQuery={purchase.query}
+                />
+              </div>
+            </div>
+            {view !== "payments" && (
+              <aside className="workspace-rail">
+                <section className="rail-card today-card">
+                  <span className="eyebrow">A LITTLE OVERVIEW</span>
+                  <h2>
+                    {today
+                      ? new Date(`${today}T12:00:00`).toLocaleDateString(
+                          "en-US",
+                          { weekday: "long", month: "short", day: "numeric" },
+                        )
+                      : "Today"}
+                  </h2>
+                  <div className="today-metrics">
+                    <div>
+                      <strong>{pending.length}</strong>
+                      <span>Open tasks</span>
+                    </div>
+                    <div>
+                      <strong>{tasks.filter((t) => t.completed).length}</strong>
+                      <span>Done with care</span>
+                    </div>
+                  </div>
+                  <div className="team-line">
+                    <span className="avatar">V</span>
+                    <span className="avatar">G</span>
+                    <small>You’re in this together.</small>
+                  </div>
+                </section>
+                <section className="rail-card">
+                  <div className="section-heading">
+                    <h2>Coming up</h2>
+                    <CalendarDays size={18} />
+                  </div>
+                  {upcoming.length ? (
+                    upcoming.map((t) => (
+                      <div className="upcoming-item" key={t.id}>
+                        <span>{dateLabel(t.date)}</span>
+                        <div>
+                          <strong>{t.title}</strong>
+                          <small>{name(t.owner)}</small>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rail-empty">
+                      <p>No upcoming dates yet.</p>
+                      <button
+                        className="text-action"
+                        onClick={() => open("appointment")}
+                      >
+                        Plan an appointment <Plus size={14} />
+                      </button>
+                    </div>
+                  )}
+                  {upcoming.length > 0 && (
+                    <button
+                      className="text-action"
+                      onClick={() => setView("calendar")}
+                    >
+                      Open calendar <ArrowRight size={14} />
+                    </button>
+                  )}
+                </section>
+                <section className="rail-card budget-card">
+                  <span className="eyebrow">THE COST OF CARE</span>
+                  <h2>
+                    {money(budget)} <small>MXN</small>
+                  </h2>
+                  <p>Planned together. Approved by you.</p>
+                  <button
+                    className="secondary-action"
+                    onClick={() => setView("payments")}
+                  >
+                    Budget & payments <ArrowRight size={15} />
+                  </button>
+                  <div className="powered-by">
+                    <ShieldCheck size={13} />
+                    <span>
+                      Purchases powered by <b>reap</b>
+                    </span>
+                  </div>
+                </section>
+              </aside>
+            )}
+          </div>
+          <footer className="workspace-footer">
+            <span>Made for the people who care.</span>
+            <span>
+              Demo workspace · saved in this browser. Reap sandbox · no real
+              money moves.
+            </span>
+          </footer>
+        </main>
       </div>
-    </dialog>
-
-    {notice && <div className="family-toast" role="status"><Check size={18} /><span>{notice}</span><button aria-label="Dismiss notice" onClick={() => setNotice('')}><X size={18} /></button></div>}
-  </div>;
+      <dialog
+        ref={dialog}
+        className="care-dialog"
+        aria-labelledby="flow-title"
+        onCancel={() => setFlow(null)}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setFlow(null);
+        }}
+      >
+        <div className="dialog-body">
+          <button
+            className="dialog-close"
+            aria-label="Close"
+            onClick={() => setFlow(null)}
+          >
+            <X size={21} />
+          </button>
+          <span className="dialog-icon">
+            {flow === "appointment" ? (
+              <CalendarDays size={24} />
+            ) : flow === "expense" ? (
+              <Wallet size={24} />
+            ) : (
+              <Plus size={24} />
+            )}
+          </span>
+          <h2 id="flow-title">
+            {flow === "appointment"
+              ? "Plan an appointment"
+              : flow === "expense"
+                ? "Plan a care expense"
+                : `One small step for ${person}`}
+          </h2>
+          <p>Just the essentials. Your team takes it from here.</p>
+          <form className="simple-form" onSubmit={saveTask}>
+            <label>
+              What’s needed?
+              <input
+                name="title"
+                placeholder={
+                  flow === "appointment"
+                    ? "e.g. Therapy visit"
+                    : flow === "expense"
+                      ? "e.g. Weekly hygiene supplies"
+                      : "e.g. Prepare lunch for Mom"
+                }
+                required
+                autoFocus
+                maxLength={180}
+              />
+            </label>
+            <div className="form-grid">
+              <label>
+                Who’s taking care of it?
+                <select name="owner" defaultValue={actor}>
+                  {team.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {flow === "appointment"
+                  ? "Appointment date"
+                  : "When? (optional)"}
+                <input
+                  name="date"
+                  type="date"
+                  required={flow === "appointment"}
+                  defaultValue={view === "calendar" ? selectedDay : ""}
+                />
+              </label>
+            </div>
+            {flow !== "task" && (
+              <div className="form-grid">
+                <label>
+                  Planned budget (MXN)
+                  <input
+                    name="budget"
+                    type="number"
+                    min="0"
+                    max="100000"
+                    step="0.01"
+                    placeholder="700"
+                    required={flow === "expense"}
+                  />
+                </label>
+                <label>
+                  Who covers the cost?
+                  <select name="payer" defaultValue={actor}>
+                    {team.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+            {flow === "expense" && (
+              <label className="check-label">
+                <input name="recurring" type="checkbox" /> Weekly restock
+                reminder (purchases require approval)
+              </label>
+            )}
+            {flow === "appointment" && (
+              <label className="check-label">
+                <input type="checkbox" required /> I’ll confirm the time and
+                instructions with the clinic.
+              </label>
+            )}
+            <button className="primary-action full-action" type="submit">
+              Add to care plan <Check size={17} />
+            </button>
+          </form>
+        </div>
+      </dialog>
+      {notice && (
+        <div className="care-toast" role="status">
+          <Check size={18} />
+          {notice}
+          {removed && (
+            <button
+              className="undo-action"
+              onClick={() => {
+                setTasks((current) => [...current, removed]);
+                setRemoved(null);
+                setNotice("Task restored.");
+              }}
+            >
+              Undo
+            </button>
+          )}
+          <button
+            aria-label="Dismiss notification"
+            onClick={() => setNotice("")}
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }

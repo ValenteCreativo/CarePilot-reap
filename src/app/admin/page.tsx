@@ -1,4 +1,6 @@
-import CareWorkspace from '@/components/care/workspace';
-import './care.css';
-export const metadata = { title: 'Family center · CarePilot' };
-export default function AdminPage() { return <CareWorkspace />; }
+import CareWorkspace from "@/components/care/workspace";
+import "./care.css";
+export const metadata = { title: "Your care workspace · CarePilot" };
+export default function AdminPage() {
+  return <CareWorkspace />;
+}

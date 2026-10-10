@@ -1,127 +1,133 @@
 # CarePilot
 
-**Copilot for caregiving. Agentic payments by Reap.**
+**A little less to carry. A little more time together.**
 
-Caring for a loved one is a stream of small, recurring purchases — medicine that runs
-out, hygiene supplies, test co-pays, groceries. Someone always has to do them by hand.
-CarePilot turns those into an organized plan and lets an agent **buy them with Reap**,
-within an approved budget and with human authorization.
+Caring for someone you love means holding a lot in your head: the next appointment,
+who can help today, supplies running low, and how to cover another expense. Even when
+people want to help, the coordination often falls on one person.
 
-- **Cuak** — our care assistant, an LLM agent powered by **Nebius Token Factory**
-  (Qwen3). It understands a plain-language need, schedules appointments, splits
-  responsibilities, researches products (via **Tavily** + the **Reap** catalog), and
-  triggers the purchase.
-- **Reap** — the agentic-payments infrastructure. Product discovery, real quotes, card
-  enrollment, checkout, and verification all run against the **Reap Agentic module**
-  (SG sandbox). No price is ever invented; no charge happens without authorization.
+CarePilot gives that care a shared home. It helps caregivers turn everyday needs into
+clear next steps, divide responsibilities, and plan the cost of care—so there is more
+room to be present with the person who matters.
 
-> Hackathon: Agentic Hackathon (Reap × AI Builders Mexico). Theme: *Vida diaria*
-> (everyday spending for someone you care for). Everything runs in the Reap **sandbox** —
-> no real money moves.
+![CarePilot’s shared care workspace](docs/admin-workspace-redesign.png)
 
----
+## One care circle, one shared plan
 
-## The one-shot idea
+- **Know what needs doing.** A simple care board shows what is to do, in progress,
+  and done. Each task has a person responsible and an optional date.
+- **See what is coming up.** A shared calendar brings appointments, care tasks and
+  restock dates together. Appointment times still need confirmation with the clinic.
+- **Share the cost of care.** Plan expenses for medication, therapy, nutrition and
+  everyday supplies, and make clear who coordinates and who covers the cost.
+- **Ask Quak for a hand.** Describe a need in ordinary language. Quak proposes tasks,
+  dates and responsibilities for you to review before adding them to the plan.
+- **Prepare a purchase with confidence.** Research supplies, compare supported Reap
+  products, request a quote and move through a guided approval flow in the same
+  workspace. A planned expense is never treated as an authorized payment.
 
-```
-A care need  ->  Cuak understands & organizes  ->  Reap pays  ->  care stays on track
-```
+For example: Guille coordinates a therapy visit, Vale prepares lunch, and the family
+plans the next supply restock. Everyone can see their part without turning care into
+another complicated dashboard.
 
-The admin workspace (`/admin`) is a single screen built so this reads in ~3 seconds: a
-hero lockup (**cuak × reap**), a live Reap sandbox status, and a kanban board where a
-task flows left-to-right and the **"Pay with Reap"** column is literally the agentic
-checkout.
+## Meet Quak
 
----
+Quak is your care companion, powered by Nebius Token Factory. It helps organize the
+small details that add up: appointments, responsibilities, budgets and product research.
 
-## Architecture
+You decide which suggestions to apply. Quak helps coordinate care; it does not diagnose,
+prescribe, confirm a clinic booking or authorize a purchase on your behalf.
 
-Next.js 16 (App Router, React 19, TypeScript). Server routes only ever call Reap from
-the server; card data never touches CarePilot or the LLM.
+## Thoughtful payments, powered by Reap
 
-```
-src/
-  app/
-    admin/                      # the care OS (/admin) — single-screen workspace
-    care-agent/                 # full end-to-end Reap agentic checkout UI
-    care-shop/                  # product research + Reap quote (no checkout)
-    api/care/
-      chat/                     # Cuak chat (Nebius) — schedule/split/research/shop
-      ingest/                   # "Prepare my plan" (Nebius -> proposals)
-      reap/status/              # live Reap sandbox connectivity probe
-      agent/                    # the agentic payment state machine endpoint
-      shop/                     # research + quote endpoint
-  components/care/
-    workspace.tsx               # the admin board, hero, metrics, Reap spotlight
-    chat.tsx                    # Cuak assistant panel
-    agent.tsx                   # the full Reap checkout flow UI
-  lib/
-    nebius.ts                   # Nebius Token Factory client (Qwen3)
-    care/                       # chat, ingest, shopping, types (the care domain)
-    care-agent/                 # orchestrator state machine, security, store, types
-    reap/                       # Reap client + service (every Agentic endpoint)
-```
+Financial planning belongs alongside the rest of care. Reap provides the commerce
+infrastructure for supported supply purchases, while CarePilot keeps the care need,
+responsibility and budget visible.
 
-### How the money path works (safely)
+The flow uses real supplier research from Tavily and the Reap catalog. Catalog prices
+are references; a Reap quote confirms the final amount and currency. The authenticated
+funder reviews the agreement and approves the quoted terms before checkout. Card entry
+and approval codes stay on Reap’s hosted pages.
 
-1. **Prepare** — Cuak (Nebius) interprets the need into a budgeted, human-reviewable
-   intent; Tavily + Reap research produce real sources and catalog candidates.
-2. **Confirm** — a signed Care Agreement is persisted (Postgres).
-3. **Enroll** — card registration happens on Reap's hosted page (OTP never seen by us).
-4. **Quote** — a real Reap quote with final amount and currency.
-5. **Approve** — the funder authorizes; the quote terms are hashed and budget-checked.
-6. **Checkout** — Reap executes the agentic checkout.
-7. **Verify** — status is read back from Reap; "completed" requires an order id + final
-   amount, and any amount discrepancy is flagged.
+A purchase is shown as completed only after Reap confirms its status, order ID and
+final amount. Completing a care task does not mark its purchase as paid.
 
-Guards worth knowing: HMAC-signed drafts/returns, idempotency keys persisted *before*
-each Reap call (uncertain results stay pending, never duplicated), MXN-only budget math
-with no FX, and strict path allow-listing on the Reap client.
+Built for the **Agentic Hackathon by Reap × AI Builders Mexico**, around everyday care
+and spending for someone you love. All payment flows use the **Reap sandbox**; no real
+money moves.
 
----
-
-## Running locally
+## Try it locally
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in the keys below
-npm run dev                  # http://localhost:3000  (or 3001 if 3000 is taken)
+cp .env.example .env.local
+# Add the service credentials you want to use.
+npm run dev
 ```
 
-Open **`/admin`** for the main experience.
+Open [localhost:3000/admin](http://localhost:3000/admin) for the care workspace, or `/`
+for the landing page. For port 3010, run `npm run dev -- --port 3010`.
 
-### Environment variables
+Start with **Try a sample plan**, or add your own task, appointment or planned expense.
+The three main views are **Care board**, **Calendar**, and **Budget & payments**.
+The sample plan contains example tasks, not bookings or purchases.
+
+The board and calendar work without external service credentials. Quak, research and
+purchases require their respective services below.
+
+### Service configuration
 
 | Variable | Purpose |
 |----------|---------|
-| `NEBIUS_API_KEY`, `NEBIUS_BASE_URL`, `NEBIUS_MODEL` | Cuak's LLM (Nebius Token Factory, Qwen3) |
-| `TAVILY_API_KEY` | Real product/price research |
-| `REAP_API_TOKEN`, `REAP_BASE_URL`, `REAP_API_VERSION` | Reap Agentic module (SG sandbox) |
-| `DATABASE_URL` | Neon Postgres — accounts + persisted agentic runs |
-| `CAREPILOT_APP_ORIGIN` | Public HTTPS origin for Reap redirect return URLs |
-| `CARE_AGENT_SESSION_SECRET` | HMAC secret (≥32 chars) for signed drafts/sessions |
+| `NEBIUS_API_KEY`, `NEBIUS_BASE_URL`, `NEBIUS_MODEL` | Quak’s language model |
+| `TAVILY_API_KEY` | Supplier and product research |
+| `REAP_API_TOKEN`, `REAP_BASE_URL`, `REAP_API_VERSION` | Reap Agentic module, SG sandbox |
+| `DATABASE_URL` | Accounts and persisted purchase agreements in Postgres |
+| `CAREPILOT_APP_ORIGIN` | Application origin; hosted Reap returns require a public HTTPS origin |
+| `CARE_AGENT_SESSION_SECRET` | Secret of at least 32 characters for signed sessions and agreements |
 
-The `/admin` board and Cuak work with just Nebius + Reap + Tavily. The full checkout at
-`/care-agent` additionally needs `DATABASE_URL`, `CAREPILOT_APP_ORIGIN`, and
-`CARE_AGENT_SESSION_SECRET`.
+Authenticated checkout also needs a CarePilot funder account, the database, a session
+secret and a configured return origin. The family name selector is for planning; it
+does not grant payment authority.
 
-### Scripts
+## What the demo does today
+
+The care plan is saved in this browser, including task progress and dates. It is not
+yet a synchronized multi-user workspace. Authenticated purchase runs are stored
+separately in Postgres.
+
+Weekly restock reminders help identify recurring needs; they are not an unattended
+subscription or automatic charge. Clinical expenses can be planned, but purchases are
+limited to products available through supported Reap merchants.
+
+The current purchase budget is **MXN-only**, with no automatic currency conversion.
+Quotes in another currency or above the budget are blocked. A verified connection or
+a product result is not evidence of a completed checkout.
+
+## For builders
+
+Next.js 16, React 19 and TypeScript power the interface. Server routes connect to
+Nebius, Tavily and Reap; payment credentials stay on the server.
+
+| Area | Location |
+|------|----------|
+| Care board, calendar and budget workspace | `src/components/care/workspace.tsx` |
+| Quak conversation and reviewed proposals | `src/components/care/chat.tsx` |
+| Product research and quote preview | `src/components/care/research.tsx` |
+| Guided authenticated purchase flow | `src/components/care/agent.tsx` |
+| Care APIs | `src/app/api/care/` |
+| Purchase orchestration, approvals and storage | `src/lib/care-agent/` |
+| Reap integration | `src/lib/reap/` |
+
+The former `/care-agent` and `/care-shop` pages redirect into `/admin` so the experience
+stays in one workspace. Purchase runs remain protected by verified identity, signed
+agreements, budget checks and persisted idempotency keys.
 
 ```bash
-npm run build       # production build
-npm run typecheck   # tsc --noEmit
-npm run lint        # eslint
-npm run test        # tsx --test tests/*.test.ts
+npm run build
+npm run typecheck
+npm run lint
+npm test
 ```
 
----
-
-## Notes
-
-- **Sandbox only.** Reap checkout is simulated; no real money moves.
-- **Human-in-the-loop.** No action authorizes a payment on its own; the funder approves
-  real quote terms before any checkout.
-- **No invented data.** Prices and merchants come from Reap/Tavily, never the model.
-
-For a deeper, criteria-by-criteria walkthrough aimed at evaluators, see
-[`JUDGES.md`](./JUDGES.md).
+For the technical hackathon evaluation guide, see [JUDGES.md](JUDGES.md).
