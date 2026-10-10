@@ -16,6 +16,7 @@ type PublicRun = Omit<Run, "operations"> & {
   termsHash: string | null;
   verifiedCompleted: boolean;
   amountDiscrepancy: boolean;
+  sandboxSimulation?: boolean;
   operations: Record<string, { state: string; code?: string }>;
 };
 const defaultInstruction =
@@ -53,7 +54,10 @@ export default function CareAgent({
   const [manual, setManual] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [sessionLoaded, setSessionLoaded] = useState(false);
-  const [budget, setBudget] = useState(700);
+  const [budget, setBudget] = useState(50);
+  const [currency, setCurrency] = useState<"MXN" | "SGD" | "USD">("SGD");
+  const [demoEnabled, setDemoEnabled] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
   const [responsible, setResponsible] = useState("Guille");
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -89,6 +93,7 @@ export default function CareAgent({
       .then(async (result) => {
         if (!active) return;
         setIdentity(result.identity);
+        setDemoMode(String(result.identity.email).startsWith("judge-"));
         const id = new URL(window.location.href).searchParams.get("run");
         if (id && /^[a-f0-9-]{36}$/i.test(id)) {
           try {
@@ -96,7 +101,14 @@ export default function CareAgent({
               action: "read",
               runId: id,
             });
-            if (active) setRun(saved.run);
+            if (active) {
+              setRun(saved.run);
+              setVariant(
+                saved.run.selected?.variantId ||
+                  saved.run.agreement.candidates[0]?.variantId ||
+                  "",
+              );
+            }
           } catch (e) {
             if (active)
               setError(
@@ -129,6 +141,15 @@ export default function CareAgent({
       }
       if (result.run) {
         setRun(result.run);
+        if (result.run.agreement?.candidates?.[0] && !variant)
+          setVariant(result.run.agreement.candidates[0].variantId);
+        if (result.run.checkout && !result.run.checkoutVerifiedAt) {
+          const verified = await request("/api/care/agent", {
+            action: "sync-checkout",
+            runId: result.run.id,
+          });
+          setRun(verified.run);
+        }
         setDraft(null);
         window.history.replaceState(
           null,
@@ -142,6 +163,37 @@ export default function CareAgent({
         e instanceof Error ? e.message : "The operation was not confirmed.",
       );
       return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    fetch("/api/care/demo")
+      .then((r) => r.json())
+      .then((d) => setDemoEnabled(d.enabled))
+      .catch(() => {});
+    const refresh = () =>
+      request("/api/care/agent/session")
+        .then((r) => setIdentity(r.identity))
+        .catch(() => {});
+    window.addEventListener("carepilot-session", refresh);
+    return () => window.removeEventListener("carepilot-session", refresh);
+  }, [request]);
+  async function startDemo() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await request("/api/care/demo", {});
+      setIdentity(result.identity);
+      setDemoMode(true);
+      setCurrency("SGD");
+      setBudget(50);
+      setText(
+        "I fund and authorize a maximum budget of 50 SGD for hand soap. Guille coordinates the purchase.",
+      );
+      window.dispatchEvent(new Event("carepilot-session"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Demo unavailable.");
     } finally {
       setBusy(false);
     }
@@ -205,9 +257,9 @@ export default function CareAgent({
         ? 1
         : draft
           ? 2
-          : !cardReady
+          : !run?.quote
             ? 3
-            : !run?.quote
+            : !cardReady
               ? 4
               : !run?.checkout
                 ? 5
@@ -216,8 +268,8 @@ export default function CareAgent({
     showSignIn ? "Sign in" : "Explore",
     "Describe",
     "Review",
-    "Card",
     "Quote",
+    "Card",
     "Approve",
     "Result",
   ];
@@ -303,6 +355,24 @@ export default function CareAgent({
             }}
           >
             Sign out
+          </button>
+        </div>
+      )}
+      {!identity && demoEnabled && (
+        <div className="demo-access">
+          <div>
+            <strong>Try one complete purchase</strong>
+            <p>
+              A private judge session. Real Reap sandbox calls, test card, no
+              money charged.
+            </p>
+          </div>
+          <button
+            className="primary-action"
+            disabled={busy}
+            onClick={startDemo}
+          >
+            Start checkout demo <ArrowRight size={16} />
           </button>
         </div>
       )}
@@ -403,6 +473,40 @@ export default function CareAgent({
       {step === 1 && (
         <div className="checkout-step">
           <h3>What needs restocking?</h3>
+          {demoEnabled && (
+            <div className="demo-access">
+              <strong>Ready-to-record sandbox purchase</strong>
+              <p>
+                Hand soap from Spectrum Store. You authorize a SGD50 ceiling;
+                the final quote includes shipping. Reap simulates the merchant
+                order after test-card approval.
+              </p>
+              <button
+                className="primary-action"
+                disabled={busy}
+                onClick={() => {
+                  setDemoMode(true);
+                  command({
+                    action: "prepare-human",
+                    confirmed: true,
+                    intent: {
+                      needs: ["soap"],
+                      responsible: "Guille",
+                      payer: "self",
+                      budget: { amount: 50, currency: "SGD" },
+                      tasks: [
+                        "Restock hand soap",
+                        "Guille coordinates; I review and authorize the final quote",
+                      ],
+                      clarification: null,
+                    },
+                  });
+                }}
+              >
+                Use hand soap demo · SGD50 limit <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
           <p>
             Quak prepares the plan and checks supplier sources and the supported
             Reap catalog.
@@ -453,7 +557,7 @@ export default function CareAgent({
                   </select>
                 </label>
                 <label>
-                  Budget limit (MXN)
+                  Budget limit ({currency})
                   <input
                     type="number"
                     value={budget}
@@ -466,6 +570,20 @@ export default function CareAgent({
                   />
                 </label>
               </div>
+              <label>
+                Budget currency
+                <select
+                  value={currency}
+                  onChange={(e) => {
+                    setCurrency(e.target.value as typeof currency);
+                    setManual(false);
+                  }}
+                >
+                  <option value="SGD">SGD · Singapore dollar</option>
+                  <option value="MXN">MXN · Mexican peso</option>
+                  <option value="USD">USD · US dollar</option>
+                </select>
+              </label>
               <label>
                 Who coordinates the purchase?
                 <select
@@ -498,7 +616,7 @@ export default function CareAgent({
                       needs: [manualCategory],
                       responsible,
                       payer: "self",
-                      budget: { amount: budget, currency: "MXN" },
+                      budget: { amount: budget, currency },
                       tasks: [
                         "Review hygiene supplies for this week",
                         `${responsible} coordinates the purchase after my authorization`,
@@ -615,16 +733,37 @@ export default function CareAgent({
           </div>
         </div>
       )}
-      {step === 3 && run && (
+      {step === 4 && run && (
         <div className="checkout-step">
           <div className="step-intro">
             <CreditCard size={26} />
             <h3>Your card, securely linked.</h3>
+            <p className="checkout-note">
+              Use Chrome or Safari with passkeys enabled. The in-app browser
+              cannot complete Reap’s device verification. Never enter a real
+              card in this demo.
+            </p>
             <p>
               Register your card on Reap’s hosted page, then return here to
               check its status. Linking a card does not authorize a purchase.
             </p>
           </div>
+          {run.quote && (
+            <div className="quote-total">
+              <div>
+                <span>
+                  Reap quote ready · expires {date(run.quote.expiresAt)}
+                </span>
+                <h4>{run.selected?.name}</h4>
+              </div>
+              <strong>
+                {money(
+                  run.quote.amountBreakdown.finalAmount.amount,
+                  run.quote.amountBreakdown.finalAmount.currency,
+                )}
+              </strong>
+            </div>
+          )}
           <div className="payment-status">
             <span>Card status</span>
             <strong>{run.enrollment?.status || "Not registered"}</strong>
@@ -645,7 +784,6 @@ export default function CareAgent({
                   <a
                     className="primary-action"
                     href={run.enrollment.nextAction.url}
-                    target="_blank"
                     rel="noopener noreferrer"
                   >
                     Continue securely on Reap ↗
@@ -666,6 +804,34 @@ export default function CareAgent({
         </div>
       )}
       {step === 4 && run && (
+        <button
+          className="text-action"
+          disabled={busy}
+          onClick={() => {
+            setVariant(run.selected?.variantId || "");
+            setRun({ ...run, quote: undefined, approval: undefined });
+          }}
+        >
+          Refresh the quote before continuing
+        </button>
+      )}
+      {step === 4 && (
+        <div className="demo-card-guide">
+          <strong>Reap sandbox test card</strong>
+          <p>4622 9431 2313 7797 · CVC 640 · 12/27 · OTP 456789</p>
+          <p>
+            Enter only on Reap’s hosted page.{" "}
+            <a
+              href="https://docs.reap.global/agentic-payments/setup#test-cards"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Official test-card instructions ↗
+            </a>
+          </p>
+        </div>
+      )}
+      {step === 3 && run && (
         <div className="checkout-step">
           <h3>Get the price before you decide.</h3>
           <p>
@@ -729,7 +895,11 @@ export default function CareAgent({
             {selected?.requiresShipping && (
               <fieldset>
                 <legend>Where should it go?</legend>
-                <p>Shipping details go to Reap, never to supplier research.</p>
+                <p>
+                  {demoMode
+                    ? "Synthetic sandbox address. No delivery will be made. Review it before requesting the quote."
+                    : "Shipping details go to Reap, never to supplier research."}
+                </p>
                 <div className="form-grid">
                   {[
                     ["firstName", "First name"],
@@ -746,7 +916,24 @@ export default function CareAgent({
                       <input
                         name={key}
                         required={!["region", "postalCode"].includes(key)}
-                        defaultValue={key === "country" ? "MX" : ""}
+                        defaultValue={
+                          demoMode
+                            ? (
+                                {
+                                  firstName: "Demo",
+                                  lastName: "Caregiver",
+                                  phone: "+6581234567",
+                                  addressLine1: "1 Example Street",
+                                  city: "Singapore",
+                                  region: "Singapore",
+                                  postalCode: "018989",
+                                  country: "SG",
+                                } as Record<string, string>
+                              )[key]
+                            : key === "country"
+                              ? "MX"
+                              : ""
+                        }
                         maxLength={200}
                       />
                     </label>
@@ -854,7 +1041,6 @@ export default function CareAgent({
             <a
               className="primary-action"
               href={run.checkout.nextAction.url}
-              target="_blank"
               rel="noopener noreferrer"
             >
               Review & approve on Reap ↗
@@ -875,7 +1061,10 @@ export default function CareAgent({
                   run.checkout.finalAmount.amount,
                   run.checkout.finalAmount.currency,
                 )}
-              . Sandbox confirmation; delivery is not confirmed.
+              .{" "}
+              {run.sandboxSimulation
+                ? "Reap simulated merchant order. No money or delivery."
+                : "Sandbox confirmation; delivery is not confirmed."}
             </p>
           ) : (
             <p>

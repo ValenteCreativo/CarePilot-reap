@@ -1,60 +1,46 @@
-# CarePilot demo readiness
+# CarePilot recording guide
 
-## Confirmed in the configured Reap SG sandbox
+Live demo: https://carepilot-2.vercel.app/admin?view=payments
 
-A fresh `hand soap` search on October 10, 2026 returned these catalog products from
-**Spectrum Store** through the real Reap product search and details endpoints:
+## Record the purchase first
 
-| Product | Catalog price |
-|---------|---------------|
-| Hand Soap — Ginger Lime | SGD 31.10 |
-| Foaming Hand Soap — Cotton & Linen | SGD 25.10 |
-| Hand Soap — Herbes de Provence | SGD 31.10 |
+Use **Chrome or Safari with passkeys enabled**. Reap's hosted enrollment requires device verification; the Codex in-app browser showed `Passkey Not Supported`. Do not reload a used hosted session link. Keep the same browser for CarePilot, enrollment and checkout so the signed funder session survives the return.
 
-These are catalog results, not final quotes or completed orders. Shipping is required.
-Availability and prices can change; the live API remains the authority. This does not
-establish merchant availability for production or delivery to Mexico.
+1. Select **Start checkout demo** for an isolated, synthetic judge session (one hour).
+2. Select **Use hand soap demo · SGD50 limit**. This is an explicit sample selection, not an invented AI purchase.
+3. Review the responsibilities and budget; select **Save & continue**. Saving the plan authorizes no charge.
+4. Request the Reap quote. The sample includes a synthetic Singapore shipping address; no delivery is made. The live smoke test returned **SGD36.10**, including SGD5 shipping, below the SGD50 ceiling. Prices can change; review the current quote and expiry.
+5. Link the card on Reap and complete its device/passkey verification yourself. The hosted step returns to CarePilot, which reads enrollment status from Reap. An `ACTIVE` enrollment can be reused only by its authenticated owner.
+6. Review the final quote, explicitly authorize the product, merchant, shipping, currency and total, then continue to Reap approval. Complete any hosted verification.
+7. CarePilot reads the checkout back from Reap. Success requires `COMPLETED`, an order reference, matching quote/enrollment references and a reconciled final amount. The receipt appears in Budget & payments with a downloadable record.
 
-## Recommended judge access
+Official public sandbox test card, entered **only on Reap's hosted page**:
 
-Use a dedicated CarePilot test account, distributed privately to the evaluators.
-Keep its care data synthetic and its payment enrollment exclusively in Reap sandbox.
-Do not publish a real card, a personal login or an enrollment token in the frontend.
-Use the test card procedure supplied by Reap on its hosted page. Keep explicit quote
-review and hosted approval; sandbox does not make shared ownership or privacy checks
-unnecessary.
+| Number | CVC | Expiry | OTP |
+| --- | --- | --- | --- |
+| 4622 9431 2313 7797 | 640 | 12/27 | 456789 |
 
-Before offering a working checkout demo:
+This deployment enables Reap's documented `X-Simulate-Checkout: COMPLETED` header. It still uses real Reap API requests and hosted enrollment/approval, but the merchant order is **simulated**. No real money or delivery. The UI labels it accordingly and excludes it from real spending.
 
-1. Configure the accounts database and apply the agent migration.
-2. Configure a public HTTPS return origin and the signing secret.
-3. Create the dedicated test account and verify access to the sandbox enrollment.
-4. Resolve the currency mismatch: current agreements only allow MXN, while these
-   products are priced in SGD. A demo budget must explicitly use the quote's native
-   currency; do not invent an exchange rate or bypass the budget check.
-5. Verify the complete path: agreement, enrollment, quote, approval, checkout,
-   read-back `COMPLETED`, order ID and final amount. Record only sanitized evidence.
+A connectivity badge, catalog item, quote or hosted return is not a completed order. On October 10 the catalog, persisted agreement and live quote were verified; full hosted approval was handed to the user because the in-app browser cannot create the required passkey. Do not claim end-to-end completion until readback provides the matching order and amount.
 
-The local environment checked during this review had no configured database or
-return origin. No checkout was executed. Deployment configuration must be checked
-separately; local values do not prove what is configured on Vercel.
+## Show the care product
 
-Reap documents a sandbox checkout simulation header. If used for evaluation, label
-the result as a simulated sandbox order, never as a real purchase or delivery.
+- **One-minute setup:** person cared for, caregiver name and first need. The plan is stored in Postgres.
+- **Invite a caregiver:** the coordinator creates a private, single-use link valid for seven days. Share it privately; use a separate browser profile/device to join as another caregiver. Up to three caregivers can manage the plan.
+- **Synchronization:** updates poll every three seconds. Revision conflicts keep local edits and ask the caregiver to review the shared version. Server checks reject non-members.
+- **Calendar and reminders:** due/overdue tasks show their owner. Completing a recurring task schedules the next weekly reminder. No unattended purchase or automatic charge occurs.
+- **Budget and receipts:** manually record a therapy/nutrition/medication expense with amount, native currency, date and receipt reference. Compare MXN planned vs recorded spending; other currencies stay separate. Manual records are not provider-verified payments.
+- **Reap evidence:** verified sandbox orders are scoped to the funder, carry the provider reference and remain separate from recorded real spending. Other caregivers cannot authorize purchases under the funder's identity.
+
+## Configuration and evidence
+
+Apply `database/initial.sql`. Configure `DATABASE_URL`, `CARE_AGENT_SESSION_SECRET`, `CAREPILOT_APP_ORIGIN` (public HTTPS), Reap sandbox credentials/version, Tavily and Nebius. Judge entry is explicitly gated by `CAREPILOT_DEMO_ENABLED=true`; merchant simulation by `REAP_SIMULATE_CHECKOUT=true`. The adapter is pinned to the SG sandbox and cannot address the production payment API.
+
+Verified: production deployment, three distinct caregiver sessions, invitation joining, cross-session update visibility, stale-write rejection, non-member rejection, live catalog and quote, build/type checking, 14 unit tests. Demo accounts are synthetic and session-based; durable account recovery, notifications while the app is closed, receipt-file uploads and unattended purchases are future work.
 
 Primary references:
-- [Reap setup](https://docs.reap.global/agentic-payments/setup)
-- [One-time purchases](https://docs.reap.global/agentic-payments/one-time-purchases)
+
+- [Reap setup and official test cards](https://docs.reap.global/agentic-payments/setup)
+- [One-time purchases and sandbox simulation](https://docs.reap.global/agentic-payments/one-time-purchases)
 - [Merchant coverage FAQ](https://docs.reap.global/agentic-payments/faq)
-
-## What would make this a stronger product
-
-1. Shared, persistent care circles with invitations and clear permissions. The board
-   is currently local to one browser; real collaboration is the core product promise.
-2. A short onboarding: who needs care, who can help, and the first task or restock.
-3. Useful reminders and restock proposals, with a clear owner and approval. Measure
-   missed tasks and time saved rather than the number of AI messages.
-4. Financial clarity: planned versus spent amounts, receipts, who paid, and the
-   next expected expense. Avoid treating a completed task as a confirmed payment.
-5. Validate the US$30/month family subscription with caregivers. Measure retention,
-   AI/research cost per care circle and support load before promising unlimited usage.

@@ -18,7 +18,7 @@ export async function discover(intent: Intent): Promise<Candidate[]> {
   const found: { id: string; category: typeof categories[number] }[] = [];
   const queries = { wipes: 'personal body wet wipes', gloves: 'disposable hygiene gloves', soap: 'hand soap' };
   for (const category of intent.needs) {
-    const search = await reapRequest('/agentic/products/search', z.object({ products: z.array(z.object({ id: z.string(), name: z.string(), available: z.boolean().optional() }).passthrough()) }), { query: queries[category], context: { country: 'MX', currency: 'MXN' }, filters: { availability: 'AVAILABLE_ONLY' }, pagination: { limit: 5 } });
+    const search = await reapRequest('/agentic/products/search', z.object({ products: z.array(z.object({ id: z.string(), name: z.string(), available: z.boolean().optional() }).passthrough()) }), { query: queries[category], context: { country: intent.budget.currency === 'SGD' ? 'SG' : intent.budget.currency === 'USD' ? 'US' : 'MX', currency: intent.budget.currency }, filters: { availability: 'AVAILABLE_ONLY' }, pagination: { limit: 5 } });
     found.push(...search.products.filter(p => p.available !== false && matchesCategory(p.name, category)).slice(0, 1).map(p => ({ id: p.id, category })));
     if (found.length) break; // one vertical purchase, never a multi-product shopping loop
   }
@@ -55,6 +55,7 @@ async function resolveProducts(found: {id: string; category: Candidate['category
 }
 export const reap = {
   discover,
+  listEnrollments: (ownerId: string) => reapRequest(`/agentic/enrollments?ownerType=CLIENT_REFERENCE&ownerId=${encodeURIComponent(ownerId)}&limit=20`, z.object({items:z.array(enrollmentSchema)})),
   getEnrollment: (id: string): Promise<Enrollment> => reapRequest(`/agentic/enrollments/${encodeURIComponent(id)}`, enrollmentSchema),
   createEnrollment: (body: unknown, key: string): Promise<Enrollment> => reapRequest('/agentic/enrollments', enrollmentSchema, body, key),
   getQuote: (id: string): Promise<Quote> => reapRequest(`/agentic/quotes/${encodeURIComponent(id)}`, quoteSchema),

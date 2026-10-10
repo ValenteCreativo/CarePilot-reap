@@ -7,6 +7,7 @@ export type CareProposalResult = { eventId: string; mode: 'rules' | 'nebius'; pr
 export const members: CareMember[] = [
   { id: 'vale', name: 'Vale', roles: ['coordinator', 'payer'] },
   { id: 'guille', name: 'Guille', roles: ['owner', 'member'] },
+  { id: 'helper', name: 'Caregiver', roles: ['member'] },
   { id: 'mama', name: 'Mom', roles: ['recipient'] },
 ];
 export const demoInstruction = 'The doctor ordered two studies for Mom. Guille will handle scheduling them. I cover the expenses. We also need supplies for the week, with a maximum budget of $700';

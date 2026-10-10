@@ -13,5 +13,7 @@ test('Nebius purchasing intent preserves explicit payer, responsible and budget 
     await assert.rejects(interpret('Guille buys soap'), /confirm the person responsible/);
     await assert.rejects(interpret('Guille buys soap; I pay 500 MXN'), /confirm the person responsible/);
     await assert.rejects(interpret('Vale buys soap; I pay 700 MXN'), /confirm the person responsible/);
+    await assert.rejects(interpret('Guille buys soap; I pay 700 SGD and also have MXN5'), /confirm the person responsible/);
+    assert.deepEqual(await interpret('Guille buys soap; I pay MXN700'), intent);
   } finally { nebiusService.generateJson = original; }
 });

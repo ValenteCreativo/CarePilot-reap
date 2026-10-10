@@ -21,3 +21,15 @@ CREATE TABLE IF NOT EXISTS care_agent_login_limits (
   attempts integer NOT NULL DEFAULT 0,
   expires_at timestamptz NOT NULL
 );
+CREATE TABLE IF NOT EXISTS care_circles (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), owner_id uuid NOT NULL REFERENCES users(id),
+ state jsonb NOT NULL, revision integer NOT NULL DEFAULT 1, updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS care_circle_members (
+ circle_id uuid NOT NULL REFERENCES care_circles(id), user_id uuid NOT NULL REFERENCES users(id),
+ slot text NOT NULL, name text NOT NULL, PRIMARY KEY(circle_id,user_id), UNIQUE(circle_id,slot)
+);
+CREATE TABLE IF NOT EXISTS care_circle_invites (
+ token_hash text PRIMARY KEY, circle_id uuid NOT NULL REFERENCES care_circles(id),
+ expires_at timestamptz NOT NULL, used_by uuid REFERENCES users(id)
+);

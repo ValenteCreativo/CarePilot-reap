@@ -20,6 +20,9 @@ import {
   X,
 } from "lucide-react";
 import CareChat from "./chat";
+import CareCircle from "./circle";
+import ExpenseTracker from "./expense-tracker";
+import type { CircleState } from "@/lib/care-circle/schema";
 import CareAgent from "./agent";
 import type { CareChatAction } from "@/lib/care/chat";
 import { members, type Agreement } from "@/lib/care/types";
@@ -27,9 +30,7 @@ import { members, type Agreement } from "@/lib/care/types";
 type View = "overview" | "calendar" | "payments";
 type Task = Agreement & { started?: boolean; recurring?: boolean };
 type Flow = "task" | "appointment" | "expense" | null;
-const team = members.filter((m) => !m.roles.includes("recipient"));
-const name = (id: string) =>
-  team.find((m) => m.id === id)?.name || "Unassigned";
+const defaultTeam = members.filter((m) => !m.roles.includes("recipient"));
 const money = (v: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "MXN" }).format(
     v,
@@ -50,8 +51,16 @@ const stageOf = (t: Task) =>
   t.completed ? "done" : t.started ? "doing" : "todo";
 const storageKey = "carepilot-workspace-v2";
 
-export default function CareWorkspace() {
-  const [view, setView] = useState<View>("overview");
+export default function CareWorkspace({
+  initialView = "overview",
+}: {
+  initialView?: View;
+}) {
+  const [team, setTeam] = useState(defaultTeam);
+  const name = (id: string) =>
+    team.find((m) => m.id === id)?.name || "Unassigned";
+  const [receipts, setReceipts] = useState<CircleState["receipts"]>([]);
+  const [view, setView] = useState<View>(initialView);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [person, setPerson] = useState("Mom");
@@ -92,6 +101,24 @@ export default function CareWorkspace() {
           instruction: "",
         });
       try {
+        const savedReceipts = JSON.parse(
+          localStorage.getItem(`${storageKey}-receipts`) || "[]",
+        );
+        if (Array.isArray(savedReceipts))
+          setReceipts(
+            savedReceipts
+              .filter(
+                (r) =>
+                  r &&
+                  typeof r.amount === "number" &&
+                  Number.isFinite(r.amount) &&
+                  r.amount >= 0 &&
+                  ["MXN", "USD", "SGD"].includes(r.currency) &&
+                  typeof r.title === "string" &&
+                  typeof r.id === "string",
+              )
+              .slice(0, 200),
+          );
         const savedPerson = localStorage.getItem(`${storageKey}-person`);
         if (savedPerson && savedPerson.length <= 80) setPerson(savedPerson);
         const saved: unknown = JSON.parse(
@@ -108,8 +135,8 @@ export default function CareWorkspace() {
                   ["task", "study", "supplies", "medication"].includes(
                     t.kind,
                   ) &&
-                  team.some((m) => m.id === t.owner) &&
-                  team.some((m) => m.id === t.payer) &&
+                  defaultTeam.some((m) => m.id === t.owner) &&
+                  defaultTeam.some((m) => m.id === t.payer) &&
                   typeof t.date === "string" &&
                   (!t.date || /^\d{4}-\d{2}-\d{2}$/.test(t.date)) &&
                   typeof t.completed === "boolean" &&
@@ -146,6 +173,10 @@ export default function CareWorkspace() {
         /* Keep the current session usable. */
       }
   }, [tasks, loaded]);
+  useEffect(() => {
+    if (loaded)
+      localStorage.setItem(`${storageKey}-receipts`, JSON.stringify(receipts));
+  }, [receipts, loaded]);
   useEffect(() => {
     if (flow) {
       opener.current = document.activeElement as HTMLElement;
@@ -389,13 +420,30 @@ export default function CareWorkspace() {
           {!t.completed && (
             <button
               onClick={() =>
-                setTasks((current) =>
-                  current.map((item) =>
+                setTasks((current) => {
+                  const completing = !!t.started;
+                  const next = current.map((item) =>
                     item.id === t.id
-                      ? { ...item, started: true, completed: !!item.started }
+                      ? { ...item, started: true, completed: completing }
                       : item,
-                  ),
-                )
+                  );
+                  if (
+                    completing &&
+                    t.recurring &&
+                    !current.some((item) => item.id === `${t.id}-next`)
+                  ) {
+                    const date = new Date(`${t.date || today}T12:00:00`);
+                    date.setDate(date.getDate() + 7);
+                    next.push({
+                      ...t,
+                      id: `${t.id}-next`,
+                      date: date.toLocaleDateString("en-CA"),
+                      started: false,
+                      completed: false,
+                    });
+                  }
+                  return next;
+                })
               }
             >
               {t.started ? (
@@ -445,7 +493,7 @@ export default function CareWorkspace() {
           <div>
             <small>YOUR CARE CIRCLE</small>
             <strong>{person}’s care</strong>
-            <span>{team.length} people, one shared plan</span>
+            <span>Space for up to {team.length} caregivers</span>
           </div>
         </div>
         <nav aria-label="Care workspace">
@@ -558,6 +606,30 @@ export default function CareWorkspace() {
                   : "Add a task"}
             </button>
           </div>
+          <CareCircle
+            loaded={loaded}
+            state={{ person, tasks: tasks as CircleState["tasks"], receipts }}
+            onLoad={(s) => {
+              setPerson(s.person);
+              setTasks(s.tasks);
+              setReceipts(s.receipts);
+            }}
+            onMembers={(m, slot) => {
+              setTeam(
+                defaultTeam.map((member) => ({
+                  ...member,
+                  name:
+                    m.find((p) => p.slot === member.id)?.name ||
+                    (member.id === "vale"
+                      ? "Coordinator"
+                      : member.id === "guille"
+                        ? "Caregiver 2"
+                        : "Caregiver 3"),
+                })),
+              );
+              setActor(slot);
+            }}
+          />
           <div
             className={
               view === "payments" ? "payments-layout" : "workspace-grid"
@@ -577,6 +649,36 @@ export default function CareWorkspace() {
               </div>
               {view === "overview" && (
                 <>
+                  {pending.some((t) => t.date && t.date <= today) && (
+                    <section className="due-reminders">
+                      <CalendarDays size={18} />
+                      <div>
+                        <strong>
+                          {
+                            pending.filter((t) => t.date && t.date <= today)
+                              .length
+                          }{" "}
+                          things need attention
+                        </strong>
+                        <p>
+                          {pending
+                            .filter((t) => t.date && t.date <= today)
+                            .slice(0, 3)
+                            .map(
+                              (t) =>
+                                `${t.title} · ${name(t.owner)}${t.date < today ? " (overdue)" : " (today)"}`,
+                            )
+                            .join(" / ")}
+                        </p>
+                      </div>
+                      <button
+                        className="secondary-action"
+                        onClick={() => setView("calendar")}
+                      >
+                        View calendar
+                      </button>
+                    </section>
+                  )}
                   <section className="care-board">
                     <div className="section-heading">
                       <div>
@@ -749,6 +851,10 @@ export default function CareWorkspace() {
                 </section>
               )}
               <div hidden={view !== "payments"}>
+                <CareAgent
+                  instruction={purchase.instruction}
+                  productQuery={purchase.query}
+                />
                 <div className="finance-summary">
                   <div>
                     <span>Planned care budget</span>
@@ -788,6 +894,11 @@ export default function CareWorkspace() {
                     </button>
                   </div>
                 </div>
+                <ExpenseTracker
+                  planned={budget}
+                  receipts={receipts}
+                  onAdd={(r) => setReceipts((current) => [...current, r])}
+                />
                 <section className="expense-list">
                   <div className="section-heading">
                     <div>
@@ -809,6 +920,7 @@ export default function CareWorkspace() {
                           <span>
                             {name(t.owner)} coordinates · {name(t.payer)} covers
                             the cost
+                            {t.date ? ` · ${dateLabel(t.date)}` : ""}
                             {t.recurring ? " · weekly reminder" : ""}
                           </span>
                         </div>
@@ -841,10 +953,6 @@ export default function CareWorkspace() {
                     </div>
                   )}
                 </section>
-                <CareAgent
-                  instruction={purchase.instruction}
-                  productQuery={purchase.query}
-                />
               </div>
             </div>
             {view !== "payments" && (
@@ -935,8 +1043,8 @@ export default function CareWorkspace() {
           <footer className="workspace-footer">
             <span>Made for the people who care.</span>
             <span>
-              Demo workspace · saved in this browser. Reap sandbox · no real
-              money moves.
+              Private by default · shared when you create a care circle. Reap
+              sandbox · no real money moves.
             </span>
           </footer>
         </main>

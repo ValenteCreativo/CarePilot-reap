@@ -105,7 +105,7 @@ Verify these safety properties (they matter for "payments feel natural *and* saf
 - **Human authorization:** `lib/care-agent/security.ts:assertApproval` requires an
   approval whose `payerId` is the authenticated funder and whose hash matches current
   quote terms; `assertQuote` enforces expiry; `assertBudget` blocks over-budget and any
-  currency mismatch (MXN-only, decimal-string math, no FX).
+  currency mismatch (explicit MXN/SGD/USD budgets, decimal-string math, no FX).
 - **Signed artifacts:** `security.ts:sign/verifySigned` HMAC-sign drafts and redirect
   return state (`CARE_AGENT_SESSION_SECRET`).
 - **Verified completion only:** `orchestrator.ts:presentRun` marks `verifiedCompleted`
@@ -123,6 +123,8 @@ auto-reorder schedules or automatic charges. Every purchase needs the funder's r
 
 ## 5. Flow to exercise
 
+For the quickest full checkout: open `/admin?view=payments`, select **Start checkout demo**, then **Use hand soap demo · SGD50 limit**. Review the plan, register the official Reap test card, request the native-currency quote and explicitly approve it. Reap sandbox simulation is enabled with `REAP_SIMULATE_CHECKOUT=true`; hosted approval remains part of the flow. The result is read back through Reap and labeled as a simulated merchant order. See [recording guide](docs/demo-readiness.md).
+
 1. `/admin` — use **Try a sample plan** or create a task and appointment. Check the
    board and calendar; completing a task does not mark a purchase as paid.
 2. Open **Quak** and ask for a task for Guille tomorrow. Review and apply the proposal.
@@ -136,7 +138,7 @@ auto-reorder schedules or automatic charges. Every purchase needs the funder's r
 
 The flow cannot proceed with a missing account/database configuration, no supported
 product, an expired quote, an over-budget amount or a currency mismatch. The current
-budget guard is MXN-only; SG catalog prices may use SGD. No FX conversion is invented.
+budget guard compares the explicitly selected currency; the hand-soap demo uses SGD. No FX conversion is invented.
 A completed purchase must be demonstrated with an actual verified sandbox result,
 not inferred from a connectivity badge or catalog search.
 
@@ -156,14 +158,13 @@ not inferred from a connectivity badge or catalog search.
 ## 7. Honest limitations
 
 - **Sandbox only:** no real settlement; Reap checkout is simulated.
-- **Local care plan:** board progress and calendar dates persist in browser storage,
-  not a shared backend. Authenticated purchase agreements persist in Postgres.
+- **Shared care circles:** Postgres stores the plan for up to three caregivers. Private, single-use invitations expire after seven days. Three-second polling and optimistic revisions protect against stale writes. Private plans still work in browser storage. Demo identities expire after one hour; persistent account recovery is outside the judge demo.
 - **Service configuration:** Quak needs Nebius; research needs Tavily/Reap and the
   signing secret. Checkout additionally needs a funder account, the database and a
   configured public HTTPS return origin.
 - **Recurring reminders, not automatic purchases:** the UI does not implement a
   subscription scheduler or unattended restocking.
-- **MXN budgets, no FX:** a quote in another currency is blocked, not converted.
+- **Native currency budgets, no FX:** MXN, SGD or USD must match the quote. Currencies are never added together. Manual receipts are family-entered records, not provider-verified payments.
 - **Not medical advice:** the agent refuses doses/diagnoses and flags clinical items
   for professional verification (`lib/care/chat.ts`, `lib/care/ingest.ts`).
 

@@ -67,6 +67,11 @@ export async function runAction(id: string, identity: Identity, command: { actio
     switch (command.action) {
       case 'enroll': {
         if (run.enrollment && !['FAILED', 'EXPIRED', 'REVOKED'].includes(run.enrollment.status)) break;
+        if (!run.enrollment) {
+          const available = await d.payments.listEnrollments(identity.id);
+          const active = available.items.find(e => e.status === 'ACTIVE' && e.owner.type === 'CLIENT_REFERENCE' && e.owner.id === identity.id);
+          if (active) {run.enrollment=active; event(run,'OWNED_ACTIVE_SANDBOX_CARD_REUSED');break;}
+        }
         const pending = run.operations.enrollment;
         const body = pending?.state === 'pending' ? pending.body : { source: 'EXTERNAL', owner: { type: 'CLIENT_REFERENCE', id: identity.id, email: identity.email }, presentation: { type: 'REDIRECT', returnUrl: returnUrl(run.id, 'enrollment') } };
         run.enrollment = await operate(run, 'enrollment', body, save, d.payments.createEnrollment);
@@ -137,7 +142,7 @@ export async function runAction(id: string, identity: Identity, command: { actio
 export function presentRun(run: Run) {
   const completed = !!run.checkoutVerifiedAt && run.checkout?.status === 'COMPLETED' && !!run.checkout.orderId && !!run.checkout.finalAmount;
   const mismatch = completed && run.checkout?.finalAmount && run.quote ? hash(run.checkout.finalAmount) !== hash(run.quote.amountBreakdown.finalAmount) : false;
-  return { ...run, operations: Object.fromEntries(Object.entries(run.operations).map(([key, op]) => [key, op && { state: op.state, code: op.code, startedAt: op.startedAt }])), termsHash: run.quote ? hash(quoteTerms(run, run.quote)) : null, verifiedCompleted: !!completed, amountDiscrepancy: !!mismatch };
+  return { ...run, operations: Object.fromEntries(Object.entries(run.operations).map(([key, op]) => [key, op && { state: op.state, code: op.code, startedAt: op.startedAt }])), termsHash: run.quote ? hash(quoteTerms(run, run.quote)) : null, verifiedCompleted: !!completed && !mismatch && run.checkout?.quoteId === run.quote?.id && run.checkout?.enrollmentId === run.enrollment?.id, sandboxSimulation: process.env.REAP_SIMULATE_CHECKOUT === 'true', amountDiscrepancy: !!mismatch };
 }
 export const agentCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('prepare'), text: z.string().trim().min(3).max(4000) }).strict(),

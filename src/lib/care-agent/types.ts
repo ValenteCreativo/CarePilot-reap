@@ -4,7 +4,7 @@ export const intentSchema = z.object({
   needs: z.array(z.enum(categories)).min(1).max(3),
   responsible: z.string().trim().min(1).max(80),
   payer: z.literal('self'),
-  budget: z.object({ amount: z.number().positive().max(100000), currency: z.literal('MXN') }).strict(),
+  budget: z.object({ amount: z.number().positive().max(100000), currency: z.enum(['MXN', 'SGD', 'USD']) }).strict(),
   tasks: z.array(z.string().trim().min(1).max(180)).min(1).max(5),
   clarification: z.string().max(300).nullable(),
 }).strict();

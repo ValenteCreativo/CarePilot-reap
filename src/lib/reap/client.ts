@@ -17,6 +17,8 @@ export async function reapRequest<T>(path: string, schema: z.ZodType<T>, body?: 
   const headers: Record<string, string> = { Authorization: `Bearer ${c.token}`, 'Reap-Version': c.version };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (key) headers['Idempotency-Key'] = key;
+  // Documented Reap sandbox simulation; this client cannot address production.
+  if (path === '/agentic/checkouts' && body !== undefined && process.env.REAP_SIMULATE_CHECKOUT === 'true') headers['X-Simulate-Checkout'] = 'COMPLETED';
   let response: Response;
   try { response = await fetch(c.base + path, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(20_000), cache: 'no-store', redirect: 'error' }); }
   catch { throw new ReapError('REAP_TRANSPORT_UNCERTAIN', 504, body !== undefined, null); }

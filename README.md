@@ -92,27 +92,27 @@ purchases require their respective services below.
 | `NEBIUS_API_KEY`, `NEBIUS_BASE_URL`, `NEBIUS_MODEL` | Quak’s language model |
 | `TAVILY_API_KEY` | Supplier and product research |
 | `REAP_API_TOKEN`, `REAP_BASE_URL`, `REAP_API_VERSION` | Reap Agentic module, SG sandbox |
-| `DATABASE_URL` | Accounts and persisted purchase agreements in Postgres |
+| `DATABASE_URL` | Accounts, shared care circles and purchase agreements in Postgres |
 | `CAREPILOT_APP_ORIGIN` | Application origin; hosted Reap returns require a public HTTPS origin |
 | `CARE_AGENT_SESSION_SECRET` | Secret of at least 32 characters for signed sessions and agreements |
 
-Authenticated checkout also needs a CarePilot funder account, the database, a session
-secret and a configured return origin. The family name selector is for planning; it
+Checkout uses a signed CarePilot session, the database, a session secret and a public HTTPS return origin. With `CAREPILOT_DEMO_ENABLED=true`, judges can start an isolated synthetic account without entering personal credentials. The family name selector is for planning; it
 does not grant payment authority.
 
 ## What the demo does today
 
-The care plan is saved in this browser, including task progress and dates. It is not
-yet a synchronized multi-user workspace. Authenticated purchase runs are stored
-separately in Postgres.
+Start privately on one device, or create a care circle in under a minute. Shared circles persist in Postgres and synchronize between up to three caregivers every three seconds. A coordinator can create private, single-use invitation links that expire in seven days. Revision checks prevent stale edits from silently overwriting another caregiver’s work. Purchase runs remain scoped to their authenticated funder.
+
+Due and overdue items show their owner; completing a weekly task creates the next reminder seven days later. Manual expense records include amount, currency, date and receipt reference. Verified Reap orders have downloadable receipt records and are excluded from real spending totals.
 
 Weekly restock reminders help identify recurring needs; they are not an unattended
 subscription or automatic charge. Clinical expenses can be planned, but purchases are
 limited to products available through supported Reap merchants.
 
-The current purchase budget is **MXN-only**, with no automatic currency conversion.
-Quotes in another currency or above the budget are blocked. A verified connection or
+Purchase budgets support **MXN, SGD and USD**, with no automatic currency conversion. The hand-soap sandbox demo explicitly authorizes a **SGD50** ceiling. Quotes in another currency or above the budget are blocked. A verified connection or
 a product result is not evidence of a completed checkout.
+
+For the recording walkthrough, official test card and deployment checklist, see [docs/demo-readiness.md](docs/demo-readiness.md).
 
 ## For builders
 
