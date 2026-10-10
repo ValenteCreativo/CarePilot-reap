@@ -7,7 +7,7 @@ export type CareProposalResult = { eventId: string; mode: 'rules' | 'nebius'; pr
 export const members: CareMember[] = [
   { id: 'vale', name: 'Vale', roles: ['coordinator', 'payer'] },
   { id: 'guille', name: 'Guille', roles: ['owner', 'member'] },
-  { id: 'mama', name: 'Mamá', roles: ['recipient'] },
+  { id: 'mama', name: 'Mom', roles: ['recipient'] },
 ];
-export const demoInstruction = 'El doctor indicó dos estudios para mamá. Guille se encarga de agendarlos. Yo cubro los gastos. También necesitamos suministros para la semana, con un presupuesto máximo de $700';
-export const roleLabels: Record<CareRole, string> = { coordinator: 'Coordinación', owner: 'Responsable operativo', payer: 'Financiador', member: 'Familiar', recipient: 'Persona cuidada' };
+export const demoInstruction = 'The doctor ordered two studies for Mom. Guille will handle scheduling them. I cover the expenses. We also need supplies for the week, with a maximum budget of $700';
+export const roleLabels: Record<CareRole, string> = { coordinator: 'Coordination', owner: 'Operational lead', payer: 'Funder', member: 'Family member', recipient: 'Person cared for' };

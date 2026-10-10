@@ -15,9 +15,9 @@ async function check(): Promise<Proof> {
     configured = true;
     // Synthetic owner only; never return account data to the public diagnostic UI.
     await reapRequest('/agentic/enrollments?ownerType=CLIENT_REFERENCE&ownerId=carepilot-connectivity-probe&limit=1', z.object({ items: z.array(z.unknown()) }));
-    return { configured, connected: true, environment: 'sandbox', paymentCreated: false, verifiedAt: new Date().toISOString(), elapsedMs: Date.now() - started, message: 'CarePilot recibió una respuesta válida del sandbox de Reap usando sus credenciales del servidor.' };
+    return { configured, connected: true, environment: 'sandbox', paymentCreated: false, verifiedAt: new Date().toISOString(), elapsedMs: Date.now() - started, message: 'CarePilot received a valid response from the Reap sandbox using its server credentials.' };
   } catch (error) {
-    return { configured, connected: false, environment: 'sandbox', paymentCreated: false, code: error instanceof AgentError ? error.code : 'REAP_CHECK_FAILED', message: configured ? 'Reap no confirmó la conexión. Revisa las credenciales o intenta nuevamente.' : 'Falta configurar Reap sandbox en las variables del servidor.' };
+    return { configured, connected: false, environment: 'sandbox', paymentCreated: false, code: error instanceof AgentError ? error.code : 'REAP_CHECK_FAILED', message: configured ? 'Reap did not confirm the connection. Check the credentials or try again.' : 'Reap sandbox is not configured in the server variables.' };
   }
 }
 export async function GET() {
