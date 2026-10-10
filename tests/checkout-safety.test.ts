@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { intentSchema, type Run } from "../src/lib/care-agent/types";
-import { assertBudget } from "../src/lib/care-agent/security";
+import { assertBudget, hash } from "../src/lib/care-agent/security";
 import { presentRun } from "../src/lib/care-agent/orchestrator";
 import { circleStateSchema } from "../src/lib/care-circle/schema";
 test("native SGD budget works; FX and over-budget amounts remain blocked", () => {
@@ -181,4 +181,13 @@ test("authorized checkout is read back and repeated clicks cannot create a secon
       delete process.env.CARE_AGENT_SESSION_SECRET;
     else process.env.CARE_AGENT_SESSION_SECRET = previousSecret;
   }
+});
+
+ test("quote hashes survive JSONB key ordering but reject changed payment terms", () => {
+  const terms = { quoteId: "q1", breakdown: { finalAmount: { amount: 36.1, currency: "SGD" } }, shippingOptions: [{ id: "standard", amount: 5 }] };
+  const readback = { shippingOptions: [{ amount: 5, id: "standard" }], breakdown: { finalAmount: { currency: "SGD", amount: 36.1 } }, quoteId: "q1" };
+  assert.equal(hash(terms), hash(readback));
+  assert.notEqual(hash(terms), hash({ ...readback, quoteId: "q2" }));
+  assert.notEqual(hash(terms), hash({ ...readback, breakdown: { finalAmount: { currency: "SGD", amount: 37.1 } } }));
+  assert.notEqual(hash(["first", "second"]), hash(["second", "first"]));
 });

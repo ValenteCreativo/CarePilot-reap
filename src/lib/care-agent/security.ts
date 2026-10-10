@@ -10,7 +10,15 @@ export function verifySigned(value: unknown, signature: string) {
   const expected = sign(value);
   return /^[a-f0-9]{64}$/.test(signature) && timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }
-export function hash(value: unknown): string { return createHash('sha256').update(JSON.stringify(value)).digest('hex'); }
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [key, canonical(entry)]));
+  }
+  return value;
+}
+// Postgres JSONB and provider responses may reorder keys without changing terms.
+export function hash(value: unknown): string { return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex'); }
 export function assertDraft(draft: Draft, signature: string, ownerId: string) {
   if (!verifySigned({ ownerId, draft }, signature) || Date.parse(draft.expiresAt) <= Date.now())
     throw new AgentError('DRAFT_INVALID', 'The proposal changed or expired. Prepare it again.', 409);
