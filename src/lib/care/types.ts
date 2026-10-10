@@ -1,0 +1,13 @@
+export type CareRole = 'coordinator' | 'owner' | 'payer' | 'member' | 'recipient';
+export type CareMember = { id: string; name: string; roles: CareRole[] };
+export type CareInput = { source: 'web' | 'omi' | 'whatsapp'; familyId: string; actorId?: string; text: string; externalEventId?: string; receivedAt: string };
+export type Proposal = { id: string; title: string; kind: 'study' | 'supplies' | 'medication' | 'task'; owner: string; payer: string; budget: number | null; due: string; clinical: boolean; evidence: string; inference: string; };
+export type Agreement = Proposal & { approval: 'pending' | 'approved'; completed: boolean; date: string; };
+export type CareProposalResult = { eventId: string; mode: 'rules' | 'nebius'; proposals: Proposal[]; notes: string[] };
+export const members: CareMember[] = [
+  { id: 'vale', name: 'Vale', roles: ['coordinator', 'payer'] },
+  { id: 'guille', name: 'Guille', roles: ['owner', 'member'] },
+  { id: 'mama', name: 'Mamá', roles: ['recipient'] },
+];
+export const demoInstruction = 'El doctor indicó dos estudios para mamá. Guille se encarga de agendarlos. Yo cubro los gastos. También necesitamos suministros para la semana, con un presupuesto máximo de $700';
+export const roleLabels: Record<CareRole, string> = { coordinator: 'Coordinación', owner: 'Responsable operativo', payer: 'Financiador', member: 'Familiar', recipient: 'Persona cuidada' };

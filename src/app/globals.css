@@ -1,0 +1,280 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-dm-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: var(--font-parisienne), Georgia, serif;
+  --font-display: var(--font-ultra), system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  /* Fuentes personalizadas */
+  --font-dm-sans: "DMSans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-parisienne: "Parisienne", Georgia, serif;
+  --font-ultra: "Ultra", system-ui, sans-serif;
+  --font-geist-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-geist-mono: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --radius: 1.5rem;
+
+  /* Fondo General (Azul Cielo) */
+  --background: #aee4ff;
+  /* Texto principal (AAA sobre blanco) */
+  --foreground: #004d6d;
+
+  /* Tarjetas y Contenedores */
+  --card: #ffffff;
+  --card-foreground: #004d6d;
+
+  --popover: #ffffff;
+  --popover-foreground: #004d6d;
+
+  /* Color Primario (Azul de Letras e Iconos) */
+  --primary: #0097b2;
+  --primary-foreground: #ffffff;
+
+  /* Color Secundario (Amarillo para elementos sutiles) */
+  --secondary: #fff8d7;
+  --secondary-foreground: #004d6d;
+
+  /* Acentos y Muted */
+  --muted: #fff8d7;
+  --muted-foreground: #004d6d;
+  --accent: #fff8d7;
+  --accent-foreground: #004d6d;
+
+  /* Alertas y Botón de Inicio (Rojo) */
+  --destructive: #FF0000;
+  --destructive-foreground: #ffffff;
+
+  /* Bordes e Inputs (Usamos el azul de letras con opacidad) */
+  --border: #0097b233;
+  /* 20% de opacidad */
+  --input: #0097b233;
+  --ring: #0097b2;
+
+  /* Colores de sidebar */
+  --sidebar: #fff8d7;
+  --sidebar-foreground: #0097b2;
+  --sidebar-primary: #0097b2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fff8d7;
+  --sidebar-accent-foreground: #0097b2;
+  --sidebar-border: #0097b233;
+  --sidebar-ring: #0097b2;
+
+  /* Colores de gráficos */
+  --chart-1: #0097b2;
+  --chart-2: #FF0000;
+  --chart-3: #aee4ff;
+  --chart-4: #fff8d7;
+  --chart-5: #0097b233;
+}
+
+.dark {
+  /* Modo oscuro - usando misma paleta con ajustes */
+  --background: #003d5c;
+  --foreground: #ffffff;
+  --card: #004d6d;
+  --card-foreground: #ffffff;
+  --popover: #004d6d;
+  --popover-foreground: #ffffff;
+  --primary: #aee4ff;
+  --primary-foreground: #0097b2;
+  --secondary: #004d6d;
+  --secondary-foreground: #ffffff;
+  --muted: #004d6d;
+  --muted-foreground: #aee4ff;
+  --accent: #004d6d;
+  --accent-foreground: #ffffff;
+  --destructive: #ff6666;
+  --destructive-foreground: #ffffff;
+  --border: #aee4ff33;
+  --input: #aee4ff33;
+  --ring: #aee4ff;
+  --sidebar: #004d6d;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #aee4ff;
+  --sidebar-primary-foreground: #0097b2;
+  --sidebar-accent: #004d6d;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #aee4ff33;
+  --sidebar-ring: #aee4ff;
+  --chart-1: #aee4ff;
+  --chart-2: #ff6666;
+  --chart-3: #003d5c;
+  --chart-4: #fff8d7;
+  --chart-5: #aee4ff33;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: var(--ring);
+    outline-offset: 2px;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+@layer utilities {
+  .logo-rotate {
+    /* Performance boost via hardware acceleration */
+    transition: transform 0.1s ease-out;
+    will-change: transform;
+  }
+
+  /* Glassmorphism Utility Classes */
+  .glass {
+    background-color: rgb(255 248 215 / 0.6); /* Cream Yellow at 60% */
+    backdrop-filter: blur(8px); /* Medium blur */
+    -webkit-backdrop-filter: blur(8px); /* Safari support */
+    border: 1px solid rgb(0 151 178 / 0.1); /* Primary at 10% */
+    box-shadow: 0 8px 32px 0 rgb(0 151 178 / 0.08);
+    transition: all 300ms ease-in-out;
+  }
+
+  .glass-cream {
+    background-color: rgb(255 248 215 / 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgb(0 151 178 / 0.1);
+    box-shadow: 0 8px 30px rgb(0 151 178 / 0.08);
+  }
+
+  .glass-hover:hover {
+    background-color: rgb(255 248 215 / 0.7); /* Increase to 70% */
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px 0 rgb(0 151 178 / 0.12);
+  }
+
+  /* Dark mode variant */
+  .dark .glass-dark {
+    background-color: rgb(0 77 109 / 0.7); /* Darker blue at 70% */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgb(174 228 255 / 0.15);
+    box-shadow: 0 8px 32px 0 rgb(0 0 0 / 0.3);
+    transition: background-color 300ms, border-color 300ms, backdrop-filter 300ms;
+  }
+
+  /* Dark mode variants for all glassmorphism classes */
+  .dark .glass {
+    background-color: rgb(0 77 109 / 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgb(174 228 255 / 0.15);
+    box-shadow: 0 8px 32px 0 rgb(0 0 0 / 0.3);
+  }
+
+  .dark .glass-cream {
+    background-color: rgb(0 77 109 / 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgb(174 228 255 / 0.15);
+    box-shadow: 0 8px 32px 0 rgb(0 0 0 / 0.3);
+  }
+
+  .dark .glass-hover:hover {
+    background-color: rgb(0 77 109 / 0.8); /* Increase to 80% */
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px 0 rgb(174 228 255 / 0.2);
+  }
+
+  /* Browser compatibility fallbacks */
+  @supports (backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px)) {
+    /* Glassmorphism styles are supported - classes defined above will work */
+  }
+
+  @supports not ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+    .glass,
+    .glass-cream {
+      /* Fallback with higher opacity */
+      background-color: rgb(255 248 215 / 0.85);
+    }
+    
+    .glass-hover:hover {
+      background-color: rgb(255 248 215 / 0.9);
+    }
+    
+    .dark .glass-dark {
+      background-color: rgb(0 77 109 / 0.85);
+    }
+  }
+
+  /* Performance optimizations for animated elements */
+  .glass,
+  .glass-cream,
+  .glass-hover,
+  .dark .glass-dark {
+    will-change: backdrop-filter, transform;
+    /* Only use transform and opacity for animations */
+    transform: translateZ(0); /* Hardware acceleration hint */
+  }
+
+  /* Support for users with motion sensitivity */
+  @media (prefers-reduced-motion: reduce) {
+    .glass,
+    .glass-cream,
+    .glass-hover,
+    .dark .glass-dark {
+      transition: none;
+      transform: none !important;
+    }
+    
+    .glass-hover:hover {
+      transform: none !important;
+    }
+  }
+
+  /* Support for users with motion sensitivity */
+  @media (prefers-reduced-motion: reduce) {
+    .logo-rotate {
+      transition: none;
+      transform: none !important;
+    }
+  }
+}
