@@ -30,6 +30,16 @@ For example: Guille coordinates a therapy visit, Vale prepares lunch, and the fa
 plans the next supply restock. Everyone can see their part without turning care into
 another complicated dashboard.
 
+## A business built around the care circle
+
+The proposed model is a subscription per family care circle: **US$30 per month**, or
+**US$288 per year** with a 20% annual discount (US$24 per month equivalent). The service
+helps coordinate care and plan expenses; medication, therapy and merchant purchases
+are paid separately.
+
+Pricing is shown on the landing page. Subscription billing is not enabled in this demo,
+and willingness to pay has not yet been validated with paying customers.
+
 ## Meet Quak
 
 Quak is your care companion, powered by Nebius Token Factory. It helps organize the

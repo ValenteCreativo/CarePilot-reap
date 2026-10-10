@@ -166,3 +166,14 @@ not inferred from a connectivity badge or catalog search.
 - **MXN budgets, no FX:** a quote in another currency is blocked, not converted.
 - **Not medical advice:** the agent refuses doses/diagnoses and flags clinical items
   for professional verification (`lib/care/chat.ts`, `lib/care/ingest.ts`).
+
+## 8. Business model
+
+CarePilot proposes a subscription per family care circle: **US$30/month**, or
+**US$288/year** with a 20% annual discount. Medication, therapy and merchant purchases
+are separate from the software subscription. The landing page has a monthly/yearly
+pricing selector; it opens the product demo, not a subscription payment flow.
+
+The target buyer is the caregiver coordinating a loved one's care. Subscription
+billing, willingness to pay and retention are not yet validated. AI/research usage,
+service costs and support must be measured before claiming viable unit economics.
