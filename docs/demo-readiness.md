@@ -18,7 +18,7 @@ Get sandbox test details from [Reap’s official setup guide](https://docs.reap.
 
 This deployment enables Reap's documented `X-Simulate-Checkout: COMPLETED` header. It still uses real Reap API requests and hosted enrollment/approval, but the merchant order is **simulated**. No real money or delivery. The UI labels it accordingly and excludes it from real spending.
 
-A connectivity badge, catalog item, quote or hosted return is not a completed order. On October 10 the catalog, persisted agreement and live quote were verified; full hosted approval was handed to the user because the in-app browser cannot create the required passkey. Do not claim end-to-end completion until readback provides the matching order and amount.
+A connectivity badge, catalog item, quote or hosted return is not a completed order. On October 10, 2026 the complete sandbox flow was verified in Safari: hosted card enrollment, caregiver passkey approval, `COMPLETED` readback and a downloadable receipt for hand soap from Spectrum Store at **SGD36.10**. The order reference was `ord_01M4JHV8MQSQXYWG6DR93XRQQE`. Quak also prepared an October 20 appointment that was applied to the calendar. The caregiver performed private authentication; the recording omits those steps.
 
 ## Show the care product
 
@@ -33,7 +33,7 @@ A connectivity badge, catalog item, quote or hosted return is not a completed or
 
 Apply `database/initial.sql`. Configure `DATABASE_URL`, `CARE_AGENT_SESSION_SECRET`, `CAREPILOT_APP_ORIGIN` (public HTTPS), Reap sandbox credentials/version, Tavily and Nebius. Judge entry is explicitly gated by `CAREPILOT_DEMO_ENABLED=true`; merchant simulation by `REAP_SIMULATE_CHECKOUT=true`. The adapter is pinned to the SG sandbox and cannot address the production payment API.
 
-Verified: production deployment, three distinct caregiver sessions, invitation joining, cross-session update visibility, stale-write rejection, non-member rejection, live catalog and quote, build/type checking, 14 unit tests. Demo accounts are synthetic and session-based; durable account recovery, notifications while the app is closed, receipt-file uploads and unattended purchases are future work.
+Verified: production deployment, three distinct caregiver sessions, invitation joining, cross-session update visibility, stale-write rejection, non-member rejection, live catalog, quote and completed simulated checkout with matching receipt, build/type checking, 15 unit tests. Demo accounts are synthetic and session-based; durable account recovery, notifications while the app is closed, receipt-file uploads and unattended purchases are future work.
 
 Primary references:
 
